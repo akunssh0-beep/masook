@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profil Pegawai - Masook AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background: #f8fafc; 
+            color: #1e293b;
+        }
+        .masook-gradient {
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        }
+        .card-profile {
+            background: white;
+            border-radius: 3rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05);
+        }
+        .log-item {
+            @apply flex items-center justify-between p-4 bg-white border border-slate-100 rounded-3xl mb-3 shadow-sm;
+        }
+    </style>
+
+    <!-- PWA Optimized by it.adi.p Automator -->
+    <meta name="theme-color" content="#3b82f6">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+</head>
+<body class="pb-32">
+
+    <div class="masook-gradient pt-16 pb-32 px-8 text-center relative overflow-hidden">
+        <div class="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -mr-20 -mt-20 blur-3xl"></div>
+        <div class="relative z-10">
+            <div class="w-28 h-28 bg-white rounded-full mx-auto mb-5 border-4 border-white/30 overflow-hidden shadow-2xl">
+                <img id="p-foto" src="" class="w-full h-full object-cover">
+            </div>
+            <h2 id="p-nama" class="text-white font-extrabold text-2xl tracking-tight uppercase">Memuat Nama...</h2>
+            <p id="p-nip" class="text-blue-100 text-[10px] font-bold uppercase tracking-[0.2em] mt-2">NIP: ---</p>
+        </div>
+    </div>
+
+    <main class="px-6 -mt-16 relative z-20 space-y-6">
+        
+        <div class="card-profile p-8 text-center border border-white">
+            <div class="flex flex-col items-center">
+                <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <p class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-1">Kehadiran Terakhir</p>
+                <h3 id="p-status" class="text-slate-800 font-extrabold text-xl uppercase tracking-tight">Memproses...</h3>
+                <p id="p-waktu" class="text-blue-500 text-xs font-bold mt-2 px-4 py-1.5 bg-blue-50 rounded-full">Jam: --:--</p>
+            </div>
+
+            <div class="mt-8 pt-8 border-t border-slate-50">
+                <button onclick="logout()" class="w-full bg-slate-100 text-slate-500 py-4 rounded-2xl font-bold text-[10px] uppercase tracking-widest active:scale-95 transition-all flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    Keluar / Ganti Akun
+                </button>
+            </div>
+        </div>
+
+        <div>
+            <div class="flex items-center justify-between px-2 mb-4">
+                <h4 class="text-[11px] font-extrabold text-slate-500 uppercase tracking-widest">Log Aktivitas Hari Ini</h4>
+                <span class="text-[9px] bg-slate-200 px-2 py-1 rounded text-slate-600 font-bold uppercase" id="current-date">-- --- 2026</span>
+            </div>
+
+            <div id="log-container">
+                <div class="log-item">
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center text-sm font-bold">IN</div>
+                        <div>
+                            <p class="text-[11px] font-extrabold text-slate-800">ABSEN MASUK</p>
+                            <p class="text-[9px] text-slate-400 font-medium tracking-tighter">Lokasi: Area Puskesmas</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p id="log-in-time" class="text-sm font-black text-slate-700">--:--</p>
+                        <p class="text-[8px] text-emerald-500 font-bold uppercase">Berhasil</p>
+                    </div>
+                </div>
+
+                <div class="log-item">
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 bg-orange-50 text-orange-600 rounded-xl flex items-center justify-center text-sm font-bold">OUT</div>
+                        <div>
+                            <p class="text-[11px] font-extrabold text-slate-800">ABSEN PULANG</p>
+                            <p class="text-[9px] text-slate-400 font-medium tracking-tighter">Lokasi: Area Puskesmas</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p id="log-out-time" class="text-sm font-black text-slate-700">--:--</p>
+                        <p class="text-[8px] text-orange-400 font-bold uppercase">Belum Absen</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <div class="fixed bottom-10 left-0 right-0 text-center pointer-events-none">
+        <p class="text-[8px] font-bold text-slate-300 uppercase tracking-[0.4em]">it.barokah.net • v2.0</p>
+    </div>
+
+    <script>
+        window.onload = () => {
+            const data = localStorage.getItem('scanned_user');
+            if (!data) { 
+                window.location.href = 'index.html'; 
+                return; 
+            }
+            
+            const user = JSON.parse(data);
+            
+            // Render Profile Data
+            document.getElementById('p-nama').innerText = user.nama;
+            document.getElementById('p-nip').innerText = "NIP: " + user.nip;
+            document.getElementById('p-foto').src = user.foto;
+            document.getElementById('p-status').innerText = user.tipeAbsen;
+            document.getElementById('p-waktu').innerText = "Terdeteksi Jam: " + user.waktuLogin;
+
+            // Render Date
+            const now = new Date();
+            const options = { day: 'numeric', month: 'short', year: 'numeric' };
+            document.getElementById('current-date').innerText = now.toLocaleDateString('id-ID', options);
+
+            // Logic Log Sederhana
+            if(user.tipeAbsen === "MASUK") {
+                document.getElementById('log-in-time').innerText = user.waktuLogin;
+                document.getElementById('log-out-time').innerText = "--:--";
+            } else if(user.tipeAbsen === "PULANG") {
+                document.getElementById('log-in-time').innerText = "07:30"; // Contoh static data
+                document.getElementById('log-out-time').innerText = user.waktuLogin;
+                const outStatus = document.getElementById('log-out-time').nextElementSibling;
+                outStatus.innerText = "Berhasil";
+                outStatus.classList.replace('text-orange-400', 'text-emerald-500');
+            }
+        };
+
+        function logout() {
+            if(confirm("Apakah Anda ingin keluar?")) {
+                localStorage.removeItem('isLoggedIn');
+                localStorage.removeItem('scanned_user');
+                window.location.href = 'index.html';
+            }
+        }
+    </script>
+
+    
+    <style>
+        #pwa-install-ui { position: fixed; bottom: -120%; left: 0; width: 100%; background: #ffffff; z-index: 10000; padding: 24px; box-shadow: 0 -12px 48px rgba(0,0,0,0.2); border-radius: 32px 32px 0 0; transition: 0.7s cubic-bezier(0.19, 1, 0.22, 1); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; display: flex; align-items: center; gap: 20px; color: #202124; }
+        #pwa-install-ui.visible { bottom: 0; }
+        .pwa-icon-box { width: 68px; height: 68px; border-radius: 16px; background: #f1f3f4; background-image: url('icon-192.png'); background-size: cover; background-position: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1); flex-shrink: 0; }
+        .pwa-info { flex: 1; }
+        .pwa-name { font-weight: 700; font-size: 19px; margin: 0; letter-spacing: -0.02em; }
+        .pwa-meta { font-size: 12px; color: #5f6368; font-weight: 500; }
+        .pwa-stars { color: #01875f; font-size: 11px; margin-top: 3px; }
+        .pwa-install-btn { background: #01875f; color: #ffffff; border: none; padding: 12px 28px; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; transition: background 0.2s; }
+        .pwa-install-btn:active { background: #016b4c; }
+    </style>
+    <div id="pwa-install-ui">
+        <div class="pwa-icon-box"></div>
+        <div class="pwa-info">
+            <p class="pwa-name">My Awesome App</p>
+            <span class="pwa-meta">Versi 1.0.0 • Siap Offline</span>
+            <div class="pwa-stars">★★★★★ <span style="color:#5f6368;margin-left:4px">Play Store Standard</span></div>
+        </div>
+        <button class="pwa-install-btn" id="pwa-cta">Instal</button>
+    </div>
+    <script>
+      let pwaPrompt;
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./sw.js').then(reg => {
+            console.log('SW Registered');
+            reg.onupdatefound = () => { const worker = reg.installing; worker.onstatechange = () => { if (worker.state === "installed" && navigator.serviceWorker.controller) window.location.reload(); }; };
+          });
+        });
+      }
+      
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault(); pwaPrompt = e;
+        setTimeout(() => document.getElementById('pwa-install-ui')?.classList.add('visible'), 2500);
+      });
+      document.getElementById('pwa-cta')?.addEventListener('click', async () => {
+        if (pwaPrompt) { 
+            pwaPrompt.prompt(); 
+            const { outcome } = await pwaPrompt.userChoice; 
+            if (outcome === 'accepted') document.getElementById('pwa-install-ui').classList.remove('visible');
+            pwaPrompt = null; 
+        }
+      });
+    </script>
+</body>
+</html>

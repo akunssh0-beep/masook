@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Admin Dashboard - Masook</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background: #f8fafc; 
+            color: #1e293b;
+            user-select: none; 
+            margin: 0;
+            padding: 0;
+        }
+        .masook-gradient {
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        }
+        
+        /* Area Header & Statistik yang Terkunci */
+        .sticky-top-section {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background: #f8fafc;
+            padding-bottom: 0.5rem;
+        }
+
+        /* Header diperbaiki tingginya agar judul tidak tertutup */
+        .admin-header {
+            @apply pt-10 pb-28 px-6 rounded-b-[3.5rem] shadow-xl relative overflow-hidden;
+        }
+
+        .stat-card { 
+            @apply bg-white p-4 rounded-[2rem] shadow-md border border-slate-100 transition-all flex flex-col justify-center items-center text-center cursor-pointer active:scale-95; 
+        }
+        .stat-card.active {
+            @apply border-blue-500 ring-4 ring-blue-100 shadow-lg;
+        }
+
+        /* Search & Filter Container */
+        .control-panel {
+            @apply bg-white p-4 rounded-[2rem] shadow-sm border border-slate-100 mb-6 flex flex-col md:flex-row gap-3;
+        }
+
+        .input-styled {
+            @apply bg-slate-50 border border-slate-200 rounded-2xl px-4 py-2 text-[11px] font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all w-full;
+        }
+
+        .log-row { 
+            @apply flex justify-between items-center p-4 bg-white rounded-[2rem] border border-slate-100 mb-3 shadow-sm animate-fade-in transition-all active:bg-slate-50 border-l-8; 
+        }
+
+        /* Border Warna khusus Status */
+        .row-tepat { border-left-color: #10b981 !important; } 
+        .row-telat { border-left-color: #f43f5e !important; } 
+        .row-dl { border-left-color: #3b82f6 !important; }    
+        .row-belum { border-left-color: #cbd5e1 !important; } 
+
+        /* Warna Keterangan dinamis */
+        .desc-tepat { @apply text-emerald-600/80; }
+        .desc-telat { @apply text-rose-600/80; }
+        .desc-dl { @apply text-blue-600/80; }
+        .desc-belum { @apply text-slate-400; }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+
+        .badge-masuk { @apply bg-emerald-50 text-emerald-600 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-tighter border border-emerald-100; }
+        .badge-terlambat { @apply bg-rose-50 text-rose-600 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-tighter border border-rose-100; }
+        .badge-belum { @apply bg-slate-100 text-slate-500 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-tighter border border-slate-200; }
+        .badge-dl { @apply bg-blue-50 text-blue-600 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-tighter border border-blue-100; }
+        
+        ::-webkit-scrollbar { display: none; }
+
+        /* Responsive Grid Logic */
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .mode-pc .stat-grid { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; }
+        
+        @media (min-width: 768px) {
+            .stat-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+        }
+
+        main { padding-top: 1rem; }
+    </style>
+
+    <!-- PWA Optimized by it.adi.p Automator -->
+    <meta name="theme-color" content="#3b82f6">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+</head>
+<body class="mode-hp">
+
+    <div class="sticky-top-section">
+        <header class="masook-gradient admin-header">
+            <div class="absolute top-0 right-0 w-48 h-48 bg-white/10 rounded-full -mr-20 -mt-20 blur-3xl"></div>
+            <div class="max-w-6xl mx-auto relative z-10 flex justify-between items-start">
+                <div>
+                    <h1 class="text-white font-extrabold text-2xl md:text-3xl tracking-tight uppercase leading-none">Admin Panel</h1>
+                    <p class="text-blue-100 text-[10px] font-bold uppercase tracking-[0.2em] mt-2 opacity-90">UPTD PKM SAMPANAHAN</p>
+                    <p id="live-clock" class="text-white/70 text-[9px] font-black uppercase mt-1 tracking-widest"></p>
+                </div>
+                
+                <div class="flex gap-2">
+                    <div class="bg-white/10 backdrop-blur-xl p-1 rounded-2xl border border-white/20 flex gap-1">
+                        <button onclick="setMode('hp')" id="btn-hp" class="p-2 rounded-xl bg-white text-blue-600 shadow-md transition-all">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                        </button>
+                        <button onclick="setMode('pc')" id="btn-pc" class="p-2 rounded-xl text-white hover:bg-white/10 transition-all">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9.75 17L9 21h6l-.75-4M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                        </button>
+                    </div>
+                    <button onclick="window.location.href='index.html'" class="w-11 h-11 bg-white/20 backdrop-blur-xl rounded-2xl flex items-center justify-center text-white border border-white/30 active:scale-90 transition-all shadow-lg">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.8" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <div class="max-w-6xl mx-auto px-5 -mt-14 relative z-20">
+            <div id="stat-grid-container" class="stat-grid gap-3">
+                <div class="stat-card active" onclick="filterLogs('ALL', this)">
+                    <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Pegawai</p>
+                    <h2 id="stat-total" class="font-black text-xl text-slate-800 tracking-tight">...</h2>
+                </div>
+                <div class="stat-card border-b-4 border-emerald-500" onclick="filterLogs('TEPAT WAKTU', this)">
+                    <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 text-emerald-500/60">Tepat</p>
+                    <h2 id="stat-tepat" class="font-black text-xl text-emerald-600 tracking-tight">...</h2>
+                </div>
+                <div class="stat-card border-b-4 border-rose-500" onclick="filterLogs('TERLAMBAT', this)">
+                    <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 text-rose-500/60">Telat</p>
+                    <h2 id="stat-telat" class="font-black text-xl text-rose-600 tracking-tight">...</h2>
+                </div>
+                <div class="stat-card border-b-4 border-blue-500" onclick="filterLogs('DL', this)">
+                    <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 text-blue-500/60">DL</p>
+                    <h2 id="stat-dl" class="font-black text-xl text-blue-600 tracking-tight">...</h2>
+                </div>
+                <div class="stat-card" onclick="filterLogs('BELUM', this)">
+                    <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Sisa</p>
+                    <h2 id="stat-belum" class="font-black text-xl text-slate-400 tracking-tight">...</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <main class="max-w-6xl mx-auto px-6 relative z-10 mt-8">
+        
+        <!-- Fitur Pencarian & Filter -->
+        <div class="control-panel">
+            <div class="flex-1">
+                <input type="text" id="searchInput" placeholder="Cari Nama / NIP Pegawai..." oninput="handleSearch()" class="input-styled">
+            </div>
+            <div class="flex-1">
+                <input type="date" id="dateFilter" onchange="handleDateFilter()" class="input-styled">
+            </div>
+            <div class="flex gap-2">
+                <button onclick="exportToCSV()" class="bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest px-5 py-2.5 rounded-2xl flex items-center gap-2 shadow-lg shadow-emerald-900/10 active:scale-95 transition-all">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                    Export
+                </button>
+            </div>
+        </div>
+
+        <section class="pb-28">
+            <div class="flex justify-between items-center mb-6 px-1">
+                <div class="flex items-center gap-3">
+                    <div class="w-1.5 h-6 masook-gradient rounded-full"></div>
+                    <h3 id="log-title" class="font-black text-slate-800 uppercase text-[11px] tracking-[0.15em]">Log Kehadiran</h3>
+                </div>
+                <button onclick="loadAdminData()" class="text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 border border-blue-100 px-4 py-2 rounded-2xl active:scale-95 transition-all shadow-sm">Refresh</button>
+            </div>
+            
+            <div id="admin-log-container" class="space-y-1">
+                <div class="animate-pulse h-20 bg-white rounded-[2rem] w-full border border-slate-100"></div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="fixed bottom-0 left-0 right-0 py-4 bg-white/80 backdrop-blur-xl text-center border-t border-slate-100 z-40">
+        <p class="text-[9px] font-black text-slate-400 uppercase tracking-[0.4em]">UPTD PKM SAMPANAHAN � MASOOK v3.0</p>
+    </footer>
+
+    <script>
+        const API_URL = "https://script.google.com/macros/s/AKfycbzHHaHNY3KKqftUB4DkSKof4uG15dRl61AHqURfpUMpui9npiAfY6J6jURHc4n0QJXO/exec";
+        let rawLogs = [];
+        let rawPegawai = [];
+        let filteredData = [];
+        let currentStatusFilter = 'ALL';
+
+        window.onload = () => {
+            syncCurrentDateTime();
+            loadAdminData();
+            const savedMode = localStorage.getItem('admin_view_mode') || 'hp';
+            setMode(savedMode);
+            startClock();
+        };
+
+        function syncCurrentDateTime() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const localToday = `${year}-${month}-${day}`;
+            document.getElementById('dateFilter').value = localToday;
+        }
+
+        function startClock() {
+            const clockEl = document.getElementById('live-clock');
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            setInterval(() => {
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                const dateStr = now.toLocaleDateString('id-ID', options);
+                clockEl.innerText = `${dateStr} � ${timeStr}`;
+            }, 1000);
+        }
+
+        function setMode(mode) {
+            const body = document.body;
+            const btnHp = document.getElementById('btn-hp');
+            const btnPc = document.getElementById('btn-pc');
+            if (mode === 'pc') {
+                body.classList.replace('mode-hp', 'mode-pc');
+                btnPc.classList.add('bg-white', 'text-blue-600', 'shadow-md');
+                btnPc.classList.remove('text-white');
+                btnHp.classList.remove('bg-white', 'text-blue-600', 'shadow-md');
+                btnHp.classList.add('text-white');
+            } else {
+                body.classList.replace('mode-pc', 'mode-hp');
+                btnHp.classList.add('bg-white', 'text-blue-600', 'shadow-md');
+                btnHp.classList.remove('text-white');
+                btnPc.classList.remove('bg-white', 'text-blue-600', 'shadow-md');
+                btnPc.classList.add('text-white');
+            }
+            localStorage.setItem('admin_view_mode', mode);
+        }
+
+        async function loadAdminData() {
+            const container = document.getElementById('admin-log-container');
+            container.innerHTML = `<div class="animate-pulse h-20 bg-white rounded-[2rem] w-full border border-slate-100"></div>`;
+            try {
+                const [resL, resP] = await Promise.all([
+                    fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: "get_logs" }) }),
+                    fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: "get_pegawai" }) })
+                ]);
+                rawLogs = await resL.json();
+                rawPegawai = await resP.json();
+                updateStats();
+                applyAllFilters();
+            } catch (e) {
+                container.innerHTML = `<div class="bg-rose-50 p-10 rounded-[2.5rem] text-center border border-rose-100"><p class='text-rose-500 font-black text-[11px] uppercase tracking-widest'>Gagal Sinkronisasi Cloud</p></div>`;
+            }
+        }
+
+        function updateStats() {
+            const totalPegawai = rawPegawai.length;
+            const selectedDate = document.getElementById('dateFilter').value;
+            const todayLogs = rawLogs.slice(1).filter(l => isSameDay(l[0], selectedDate));
+            const hadir = todayLogs.filter(l => l[4] === "TEPAT WAKTU" || l[4] === "TERLAMBAT" || l[4] === "DL");
+            document.getElementById('stat-total').innerText = totalPegawai;
+            document.getElementById('stat-tepat').innerText = todayLogs.filter(l => l[4] === "TEPAT WAKTU").length;
+            document.getElementById('stat-telat').innerText = todayLogs.filter(l => l[4] === "TERLAMBAT").length;
+            document.getElementById('stat-dl').innerText = todayLogs.filter(l => l[4] === "DL").length;
+            document.getElementById('stat-belum').innerText = totalPegawai - hadir.length;
+        }
+
+        // Perbaikan isSameDay untuk menangani tahun 1899 (Format Jam Saja dari Sheets)
+        function isSameDay(dateStr, filterDate) {
+            if (!dateStr || dateStr === "-") return false;
+            let d = new Date(dateStr);
+            let f = new Date(filterDate);
+            
+            // Jika tahun terbaca 1899, berarti data di sheet hanya berisi jam.
+            // Kita asumsikan data tersebut adalah milik hari ini/hari yang difilter 
+            // agar tetap muncul di dashboard (Asalkan data mentahnya memang tercatat hari itu)
+            if (d.getFullYear() <= 1900) {
+                return true; 
+            }
+
+            return d.getFullYear() === f.getFullYear() &&
+                   d.getMonth() === f.getMonth() &&
+                   d.getDate() === f.getDate();
+        }
+
+        function filterLogs(status, element) {
+            document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active'));
+            if(element) element.classList.add('active');
+            currentStatusFilter = status;
+            applyAllFilters();
+        }
+
+        function handleSearch() { applyAllFilters(); }
+        function handleDateFilter() { updateStats(); applyAllFilters(); }
+
+        function applyAllFilters() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const dateVal = document.getElementById('dateFilter').value;
+            const title = document.getElementById('log-title');
+            let filtered = [];
+
+            if (currentStatusFilter === 'ALL') {
+                title.innerText = "Log Kehadiran";
+                filtered = rawLogs.slice(1);
+            } else if (currentStatusFilter === 'BELUM') {
+                title.innerText = "Pegawai Belum Absen";
+                const sudahAbsenNip = rawLogs.slice(1).filter(l => isSameDay(l[0], dateVal)).map(l => String(l[2]));
+                filtered = rawPegawai.filter(p => !sudahAbsenNip.includes(String(p.nip))).map(p => [dateVal, "-", p.nip, p.nama, "BELUM ABSEN", "Silahkan Absen"]);
+            } else if (currentStatusFilter === 'DL') {
+                title.innerText = "Pegawai Dinas Luar (DL)";
+                filtered = rawLogs.slice(1).filter(l => l[4] === "DL");
+            } else {
+                title.innerText = `Pegawai ${currentStatusFilter}`;
+                filtered = rawLogs.slice(1).filter(l => l[4] === currentStatusFilter);
+            }
+
+            if (currentStatusFilter !== 'BELUM' && dateVal) {
+                filtered = filtered.filter(l => isSameDay(l[0], dateVal));
+            }
+
+            if (query) {
+                filtered = filtered.filter(l => String(l[3]).toLowerCase().includes(query) || String(l[2]).toLowerCase().includes(query));
+            }
+
+            filteredData = filtered;
+            renderList(filtered);
+        }
+
+        function renderList(data) {
+            const container = document.getElementById('admin-log-container');
+            const dateVal = document.getElementById('dateFilter').value;
+
+            if (data.length === 0) {
+                container.innerHTML = `<div class="py-16 text-center"><p class="text-[11px] font-black text-slate-300 uppercase tracking-widest">Data Tidak Ditemukan</p></div>`;
+                return;
+            }
+            container.innerHTML = data.map(log => {
+                let statusClass = "row-belum", textClass = "desc-belum";
+                if(log[4] === 'TEPAT WAKTU') { statusClass = "row-tepat"; textClass = "desc-tepat"; } 
+                else if(log[4] === 'TERLAMBAT') { statusClass = "row-telat"; textClass = "desc-telat"; } 
+                else if(log[4] === 'DL') { statusClass = "row-dl"; textClass = "desc-dl"; }
+
+                // Perbaikan Tampilan Tanggal: Jika tahun 1899, gunakan tanggal filter
+                let d = new Date(log[0]);
+                let displayDate;
+                if (log[0] === "-" || !log[0]) {
+                    displayDate = "-";
+                } else if (d.getFullYear() <= 1900) {
+                    displayDate = new Date(dateVal).toLocaleDateString('id-ID', {day:'2-digit', month:'short', year:'numeric'});
+                } else {
+                    displayDate = d.toLocaleDateString('id-ID', {day:'2-digit', month:'short', year:'numeric'});
+                }
+
+                return `
+                <div class="log-row ${statusClass}">
+                    <div class="flex items-center gap-4">
+                        <div class="w-11 h-11 bg-slate-50 rounded-2xl flex items-center justify-center text-blue-600 shrink-0 border border-slate-100 shadow-inner">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                        </div>
+                        <div class="flex flex-col text-left">
+                            <span class="font-black text-slate-800 text-[11px] md:text-[12px] tracking-tight uppercase">${log[3]}</span>
+                            <span class="text-[8px] text-slate-400 font-bold uppercase mt-1 tracking-wider">${log[2]} � ${displayDate}</span>
+                        </div>
+                    </div>
+                    <div class="text-right flex flex-col items-end">
+                        <span class="${log[4] === 'TEPAT WAKTU' ? 'badge-masuk' : (log[4] === 'TERLAMBAT' ? 'badge-terlambat' : (log[4] === 'DL' ? 'badge-dl' : 'badge-belum'))}">${log[4]}</span>
+                        <p class="text-[8px] font-black mt-1.5 tracking-tighter italic uppercase ${textClass}">${log[1] !== "-" ? log[1] : log[5]}</p>
+                    </div>
+                </div>
+            `;}).join('');
+        }
+
+        function exportToCSV() {
+            if (filteredData.length === 0) { alert("Tidak ada data untuk diekspor"); return; }
+            let csvContent = "data:text/csv;charset=utf-8,Tanggal,Jam,NIP,Nama,Status,Keterangan\n";
+            filteredData.forEach(row => { csvContent += row.join(",") + "\n"; });
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `laporan_masook_${document.getElementById('dateFilter').value}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+
+    
+    <style>
+        #pwa-install-ui { position: fixed; bottom: -120%; left: 0; width: 100%; background: #ffffff; z-index: 10000; padding: 24px; box-shadow: 0 -12px 48px rgba(0,0,0,0.2); border-radius: 32px 32px 0 0; transition: 0.7s cubic-bezier(0.19, 1, 0.22, 1); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; display: flex; align-items: center; gap: 20px; color: #202124; }
+        #pwa-install-ui.visible { bottom: 0; }
+        .pwa-icon-box { width: 68px; height: 68px; border-radius: 16px; background: #f1f3f4; background-image: url('icon-192.png'); background-size: cover; background-position: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1); flex-shrink: 0; }
+        .pwa-info { flex: 1; }
+        .pwa-name { font-weight: 700; font-size: 19px; margin: 0; letter-spacing: -0.02em; }
+        .pwa-meta { font-size: 12px; color: #5f6368; font-weight: 500; }
+        .pwa-stars { color: #01875f; font-size: 11px; margin-top: 3px; }
+        .pwa-install-btn { background: #01875f; color: #ffffff; border: none; padding: 12px 28px; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; transition: background 0.2s; }
+        .pwa-install-btn:active { background: #016b4c; }
+    </style>
+    <div id="pwa-install-ui">
+        <div class="pwa-icon-box"></div>
+        <div class="pwa-info">
+            <p class="pwa-name">My Awesome App</p>
+            <span class="pwa-meta">Versi 1.0.0 • Siap Offline</span>
+            <div class="pwa-stars">★★★★★ <span style="color:#5f6368;margin-left:4px">Play Store Standard</span></div>
+        </div>
+        <button class="pwa-install-btn" id="pwa-cta">Instal</button>
+    </div>
+    <script>
+      let pwaPrompt;
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./sw.js').then(reg => {
+            console.log('SW Registered');
+            reg.onupdatefound = () => { const worker = reg.installing; worker.onstatechange = () => { if (worker.state === "installed" && navigator.serviceWorker.controller) window.location.reload(); }; };
+          });
+        });
+      }
+      
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault(); pwaPrompt = e;
+        setTimeout(() => document.getElementById('pwa-install-ui')?.classList.add('visible'), 2500);
+      });
+      document.getElementById('pwa-cta')?.addEventListener('click', async () => {
+        if (pwaPrompt) { 
+            pwaPrompt.prompt(); 
+            const { outcome } = await pwaPrompt.userChoice; 
+            if (outcome === 'accepted') document.getElementById('pwa-install-ui').classList.remove('visible');
+            pwaPrompt = null; 
+        }
+      });
+    </script>
+</body>
+</html>
