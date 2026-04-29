@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0f172a">
+    <title>MASOOK V6 - EXECUTIVE DASHBOARD</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+
+    <style>
+        :root { --executive-dark: #0f172a; --executive-gold: #e2e8f0; --executive-accent: #3b82f6; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #f8fafc; height: 100vh; overflow: hidden; margin: 0; }
+        
+        .page { display: none; height: 100vh; overflow-y: auto; padding-bottom: 120px; scroll-behavior: smooth; }
+        .page.active { display: block; animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
+
+        .ios-blur { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); border: 1px solid rgba(255,255,255,0.5); }
+        .executive-gradient { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); }
+        .card-shadow { box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05); }
+
+        #global-loader { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.9); z-index: 9999; flex-direction: column; align-items: center; justify-content: center; color: white; }
+        .toast { position: fixed; bottom: 120px; left: 50%; transform: translateX(-50%); background: #0f172a; color: white; padding: 12px 24px; border-radius: 50px; font-size: 11px; font-weight: 800; z-index: 10000; transition: 0.5s; opacity: 0; pointer-events: none; }
+        .toast.show { opacity: 1; transform: translateX(-50%) translateY(-10px); }
+
+        .stat-card { @apply ios-blur p-4 rounded-[2rem] flex flex-col items-center justify-center text-center transition-all active:scale-95; }
+    </style>
+</head>
+<body>
+
+    <div id="toast" class="toast">Notifikasi</div>
+
+    <div id="global-loader">
+        <div class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p class="text-[10px] font-black uppercase tracking-widest">Memuat Dashboard Eksekutif...</p>
+    </div>
+
+    <div id="login-page" class="page active flex items-center justify-center px-6 executive-gradient">
+        <div class="w-full max-w-sm text-center">
+            <h1 class="text-4xl font-black text-white tracking-tighter mb-2">MASOOK <span class="text-blue-500">PRO</span></h1>
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.4em] mb-12">Kepala Puskesmas Portal</p>
+            <div class="ios-blur p-8 rounded-[3rem] shadow-2xl">
+                <p class="text-xs font-bold text-slate-500 mb-6 uppercase">Otorisasi Eksekutif</p>
+                <input type="password" id="pin-input" placeholder="••••" class="w-full bg-slate-100 p-5 rounded-2xl font-black text-center text-2xl tracking-[0.5em] outline-none border-2 border-transparent focus:border-blue-500 mb-4 transition-all">
+                <button onclick="handleLogin()" class="w-full bg-blue-600 text-white p-5 rounded-2xl font-black text-[11px] uppercase tracking-widest active:scale-95 transition-all shadow-xl shadow-blue-900/20">Buka Dashboard</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="dashboard-page" class="page">
+        <header class="executive-gradient pt-16 pb-32 px-6 rounded-b-[4rem] shadow-2xl relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl"></div>
+            <div class="relative z-10 flex justify-between items-center">
+                <div>
+                    <p class="text-blue-400 text-[10px] font-black uppercase tracking-[0.3em] mb-1">Selamat Datang,</p>
+                    <h1 class="text-white font-black text-2xl tracking-tight leading-none uppercase">Kepala Puskesmas</h1>
+                    <p id="header-date" class="text-slate-400 text-[9px] font-bold mt-2 uppercase tracking-widest">Rabu, 29 April 2026</p>
+                </div>
+                <div class="w-14 h-14 rounded-2xl border-2 border-blue-500/30 p-1">
+                    <img src="https://ui-avatars.com/api/?name=Kepala+Puskesmas&background=1e293b&color=fff" class="w-full h-full rounded-xl object-cover">
+                </div>
+            </div>
+        </header>
+
+        <main class="-mt-20 px-5 space-y-6">
+            <div class="grid grid-cols-2 gap-4">
+                <div class="stat-card border-l-4 border-emerald-500">
+                    <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Hadir Hari Ini</p>
+                    <p id="count-hadir" class="text-2xl font-black text-slate-800">0</p>
+                </div>
+                <div class="stat-card border-l-4 border-blue-500">
+                    <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Izin/Cuti</p>
+                    <p id="count-izin" class="text-2xl font-black text-slate-800">0</p>
+                </div>
+                <div class="stat-card border-l-4 border-amber-500">
+                    <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Terlambat</p>
+                    <p id="count-telat" class="text-2xl font-black text-slate-800">0</p>
+                </div>
+                <div class="stat-card border-l-4 border-rose-500">
+                    <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Belum Absen</p>
+                    <p id="count-missing" class="text-2xl font-black text-slate-800">0</p>
+                </div>
+            </div>
+
+            <div class="ios-blur p-6 rounded-[2.5rem] card-shadow">
+                <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Tren Kehadiran Bulanan</h3>
+                <canvas id="attendanceChart" height="200"></canvas>
+            </div>
+
+            <div class="ios-blur p-6 rounded-[2.5rem] card-shadow">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Log Kehadiran Terbaru</h3>
+                    <button onclick="navigateTo('monitoring-page')" class="text-blue-600 text-[9px] font-black uppercase">Lihat Semua</button>
+                </div>
+                <div id="recent-logs" class="space-y-3">
+                    <p class="text-center text-[10px] text-slate-400 py-4">Memuat data...</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="monitoring-page" class="page">
+        <header class="p-8 text-center">
+            <h2 class="font-black text-slate-800 text-xl uppercase tracking-tighter">Monitoring Pegawai</h2>
+            <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Status Kehadiran Real-time</p>
+        </header>
+        <main class="px-5 space-y-4">
+            <div class="flex gap-2">
+                <select id="filter-unit" class="flex-1 bg-white p-4 rounded-2xl text-[10px] font-black uppercase border-none shadow-sm outline-none" onchange="refreshMonitoring()">
+                    <option value="ALL">Semua Unit</option>
+                    <option value="POLI">Poli Umum</option>
+                    <option value="RAWAT">Rawat Inap</option>
+                    <option value="TU">Tata Usaha</option>
+                </select>
+                <div class="bg-white p-4 rounded-2xl shadow-sm text-blue-600 font-black text-[10px] uppercase">
+                    Live
+                </div>
+            </div>
+            <div id="monitoring-list" class="space-y-3"></div>
+        </main>
+    </div>
+
+    <div id="approval-page" class="page">
+        <header class="p-8 text-center">
+            <h2 class="font-black text-slate-800 text-xl uppercase tracking-tighter">Approval Izin/Cuti</h2>
+            <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Permohonan Menunggu Persetujuan</p>
+        </header>
+        <main class="px-5 space-y-4" id="approval-list">
+            <div class="ios-blur p-6 rounded-[2rem] card-shadow flex flex-col gap-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center font-black text-blue-600">B</div>
+                    <div>
+                        <h4 class="text-xs font-black text-slate-800 leading-none">Budi Santoso</h4>
+                        <p class="text-[8px] text-slate-400 font-bold uppercase mt-1 tracking-widest">Poli Umum • Cuti Tahunan</p>
+                    </div>
+                </div>
+                <div class="bg-slate-50 p-3 rounded-xl">
+                    <p class="text-[9px] text-slate-500 leading-relaxed italic">"Keperluan urusan keluarga di luar kota selama 3 hari."</p>
+                </div>
+                <div class="flex gap-2 mt-2">
+                    <button onclick="toast('Izin Disetujui')" class="flex-1 bg-emerald-500 text-white py-3 rounded-xl text-[9px] font-black uppercase">Setujui</button>
+                    <button onclick="toast('Izin Ditolak')" class="flex-1 bg-rose-100 text-rose-500 py-3 rounded-xl text-[9px] font-black uppercase">Tolak</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="laporan-page" class="page">
+        <header class="executive-gradient p-10 text-white text-center rounded-b-[4rem] mb-6">
+            <h2 class="font-black text-xl uppercase tracking-widest">Laporan Bulanan</h2>
+            <p class="text-blue-300 text-[9px] font-bold uppercase tracking-[0.3em] mt-1">Export & Analytics</p>
+        </header>
+        <main class="px-6 space-y-6">
+            <div class="ios-blur p-6 rounded-[2.5rem] card-shadow">
+                <div class="space-y-4">
+                    <div>
+                        <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-2 block">Pilih Bulan</label>
+                        <select id="laporan-bulan" class="w-full bg-slate-50 p-4 rounded-2xl font-bold text-xs outline-none border-none shadow-inner"></select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="exportExcel()" class="bg-emerald-600 text-white p-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-900/20">Excel (.xlsx)</button>
+                        <button onclick="window.print()" class="bg-slate-800 text-white p-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-slate-900/20">Cetak PDF</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ios-blur p-6 rounded-[2.5rem] card-shadow">
+                <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Summary Kinerja</h3>
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center p-3 bg-slate-50 rounded-2xl">
+                        <span class="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Persentase Hadir</span>
+                        <span class="text-xs font-black text-emerald-600">94.2%</span>
+                    </div>
+                    <div class="flex justify-between items-center p-3 bg-slate-50 rounded-2xl">
+                        <span class="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Persentase Telat</span>
+                        <span class="text-xs font-black text-amber-600">5.8%</span>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="profil-page" class="page">
+        <header class="p-10 text-center">
+            <div class="w-24 h-24 bg-slate-200 rounded-[2.5rem] mx-auto mb-4 overflow-hidden border-4 border-white shadow-xl">
+                <img src="https://ui-avatars.com/api/?name=Kepala+Puskesmas&background=0f172a&color=fff" class="w-full h-full object-cover">
+            </div>
+            <h2 class="font-black text-slate-800 text-xl uppercase tracking-tighter">dr. Purnomo Adi</h2>
+            <p class="text-[9px] font-bold text-slate-400 uppercase tracking-[0.3em]">NIP. 19850712 201012 1 002</p>
+        </header>
+        <main class="px-6 space-y-4">
+            <div class="ios-blur p-6 rounded-[2.5rem] card-shadow divide-y divide-slate-100">
+                <div class="py-4 flex justify-between">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Jabatan</span>
+                    <span class="text-[10px] font-black text-slate-800 uppercase">Kepala Puskesmas</span>
+                </div>
+                <div class="py-4 flex justify-between">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Otoritas</span>
+                    <span class="text-[10px] font-black text-blue-600 uppercase">Full Executive</span>
+                </div>
+                <div class="py-4 flex justify-between">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Notifikasi</span>
+                    <span class="text-[10px] font-black text-emerald-600 uppercase">Aktif</span>
+                </div>
+            </div>
+            <button onclick="location.reload()" class="w-full bg-rose-50 text-rose-500 p-5 rounded-[2rem] font-black text-[10px] uppercase tracking-widest">Keluar Sistem</button>
+        </main>
+    </div>
+
+    <nav class="fixed bottom-0 left-0 right-0 ios-blur py-5 px-4 flex justify-around items-center rounded-t-[3.5rem] shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-[100] border-t border-white hidden" id="main-nav">
+        <button onclick="navigateTo('dashboard-page')" class="nav-btn flex flex-col items-center gap-1 text-blue-600" data-page="dashboard-page">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+            <span class="text-[7px] font-black uppercase">Dash</span>
+        </button>
+        <button onclick="navigateTo('monitoring-page')" class="nav-btn flex flex-col items-center gap-1 text-slate-400" data-page="monitoring-page">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+            <span class="text-[7px] font-black uppercase">Live</span>
+        </button>
+        <button onclick="navigateTo('approval-page')" class="nav-btn flex flex-col items-center gap-1 text-slate-400" data-page="approval-page">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            <span class="text-[7px] font-black uppercase">Approval</span>
+        </button>
+        <button onclick="navigateTo('laporan-page')" class="nav-btn flex flex-col items-center gap-1 text-slate-400" data-page="laporan-page">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+            <span class="text-[7px] font-black uppercase">Laporan</span>
+        </button>
+        <button onclick="navigateTo('profil-page')" class="nav-btn flex flex-col items-center gap-1 text-slate-400" data-page="profil-page">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7 7z"></path></svg>
+            <span class="text-[7px] font-black uppercase">Akun</span>
+        </button>
+    </nav>
+
+    <script>
+        let db;
+        let attendanceChart;
+
+        // 1. INITIALIZATION
+        const initDB = () => {
+            const request = indexedDB.open("MasookEnterpriseDB", 8);
+            request.onsuccess = (e) => {
+                db = e.target.result;
+                refreshStats();
+                initChart();
+                updateHeaderDate();
+            };
+        };
+
+        // 2. AUTHENTICATION
+        function handleLogin() {
+            const pin = document.getElementById('pin-input').value;
+            if (pin === "1234") { // PIN Eksekutif Default
+                document.getElementById('login-page').classList.remove('active');
+                document.getElementById('dashboard-page').classList.add('active');
+                document.getElementById('main-nav').classList.remove('hidden');
+                toast("Selamat Datang, Kapus");
+                refreshStats();
+            } else {
+                toast("Otorisasi Gagal!");
+            }
+        }
+
+        // 3. NAVIGATION
+        function navigateTo(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById(pageId).classList.add('active');
+            
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.replace('text-blue-600', 'text-slate-400');
+                if(btn.getAttribute('data-page') === pageId) btn.classList.replace('text-slate-400', 'text-blue-600');
+            });
+
+            if(pageId === 'monitoring-page') refreshMonitoring();
+        }
+
+        // 4. ANALYTICS & STATS
+        function refreshStats() {
+            if(!db) return;
+            const tx = db.transaction(["absensi", "staff"], "readonly");
+            const absenStore = tx.objectStore("absensi");
+            const staffStore = tx.objectStore("staff");
+
+            // Hadir Hari Ini
+            absenStore.getAll().onsuccess = (e) => {
+                const today = new Date().toLocaleDateString('id-ID');
+                const todayLogs = e.target.result.filter(log => log.tanggal === today);
+                
+                document.getElementById('count-hadir').innerText = todayLogs.filter(l => l.status.includes("Masuk")).length;
+                document.getElementById('count-telat').innerText = todayLogs.filter(l => l.jam > "08:15").length;
+                
+                // Update Recent Logs on Dashboard
+                updateRecentLogsUI(todayLogs.slice(-5).reverse());
+            };
+
+            staffStore.count().onsuccess = (e) => {
+                const total = e.target.result;
+                const hadir = parseInt(document.getElementById('count-hadir').innerText);
+                document.getElementById('count-missing').innerText = Math.max(0, total - hadir);
+            };
+        }
+
+        function initChart() {
+            const ctx = document.getElementById('attendanceChart').getContext('2d');
+            attendanceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'],
+                    datasets: [{
+                        label: 'Kehadiran (%)',
+                        data: [92, 95, 88, 94, 96, 91],
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        borderWidth: 4,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { display: false, min: 0, max: 100 },
+                        x: { grid: { display: false }, border: { display: false } }
+                    }
+                }
+            });
+        }
+
+        // 5. MONITORING UI
+        function refreshMonitoring() {
+            const list = document.getElementById('monitoring-list');
+            list.innerHTML = "";
+            const unit = document.getElementById('filter-unit').value;
+
+            const tx = db.transaction(["absensi", "staff"], "readonly");
+            tx.objectStore("staff").getAll().onsuccess = (e) => {
+                const staffs = e.target.result;
+                const today = new Date().toLocaleDateString('id-ID');
+                
+                db.transaction("absensi", "readonly").objectStore("absensi").getAll().onsuccess = (ev) => {
+                    const logs = ev.target.result.filter(l => l.tanggal === today);
+
+                    staffs.forEach(s => {
+                        const hasLog = logs.find(l => l.nip === s.nip && l.status.includes("Masuk"));
+                        const div = document.createElement('div');
+                        div.className = "ios-blur p-4 rounded-[1.5rem] flex items-center justify-between shadow-sm";
+                        div.innerHTML = `
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center font-black text-slate-400">${s.nama[0]}</div>
+                                <div>
+                                    <h4 class="text-[11px] font-black text-slate-800">${s.nama}</h4>
+                                    <p class="text-[8px] text-slate-400 font-bold uppercase">UNIT: ${s.unit || 'POLI'}</p>
+                                </div>
+                            </div>
+                            <div>
+                                ${hasLog ? 
+                                    `<span class="text-emerald-500 font-black text-[9px] uppercase bg-emerald-50 px-2 py-1 rounded-lg">${hasLog.jam}</span>` : 
+                                    `<span class="text-rose-400 font-black text-[9px] uppercase bg-rose-50 px-2 py-1 rounded-lg">Absen</span>`}
+                            </div>
+                        `;
+                        list.appendChild(div);
+                    });
+                };
+            };
+        }
+
+        function updateRecentLogsUI(logs) {
+            const container = document.getElementById('recent-logs');
+            container.innerHTML = logs.length ? "" : '<p class="text-center text-[10px] text-slate-400 py-4">Belum ada data hari ini</p>';
+            
+            logs.forEach(log => {
+                const item = document.createElement('div');
+                item.className = "flex items-center justify-between p-2 border-b border-slate-50 last:border-none";
+                item.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <div class="w-1.5 h-1.5 rounded-full ${log.status.includes("Masuk") ? 'bg-emerald-500' : 'bg-rose-500'}"></div>
+                        <span class="text-[10px] font-bold text-slate-700">${log.nama}</span>
+                    </div>
+                    <span class="text-[9px] font-black text-slate-400">${log.jam}</span>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        // 6. UTILS & REPORTING
+        function updateHeaderDate() {
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            document.getElementById('header-date').innerText = new Date().toLocaleDateString('id-ID', options);
+        }
+
+        function exportExcel() {
+            showLoader("Menyiapkan Data...");
+            const tx = db.transaction("absensi", "readonly");
+            tx.objectStore("absensi").getAll().onsuccess = (e) => {
+                const ws = XLSX.utils.json_to_sheet(e.target.result);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Laporan Absensi");
+                XLSX.writeFile(wb, `Laporan_Kapus_${new Date().getTime()}.xlsx`);
+                hideLoader();
+                toast("Excel Berhasil Diunduh");
+            };
+        }
+
+        function toast(m) {
+            const t = document.getElementById('toast');
+            t.innerText = m;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 3000);
+        }
+
+        function showLoader(t) {
+            document.getElementById('global-loader').style.display = 'flex';
+        }
+
+        function hideLoader() {
+            document.getElementById('global-loader').style.display = 'none';
+        }
+
+        window.onload = () => {
+            initDB();
+            const selectBln = document.getElementById('laporan-bulan');
+            ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"].forEach((b, i) => selectBln.add(new Option(b, String(i+1).padStart(2,'0'))));
+            selectBln.value = String(new Date().getMonth() + 1).padStart(2, '0');
+        };
+    </script>
+</body>
+</html>

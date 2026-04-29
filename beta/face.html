@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#1e40af">
+    <meta name="apple-touch-icon" content="https://ui-avatars.com/api/?name=FE&background=1e40af&color=fff">
+    <title>FACE ENROLLMENT PRO V6</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/dist/face-api.js"></script>
+
+    <style>
+        :root { --primary: #1e40af; --accent: #3b82f6; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #f1f5f9; height: 100vh; overflow: hidden; margin: 0; }
+        
+        .page { display: none; height: 100vh; overflow-y: auto; padding-bottom: 100px; }
+        .page.active { display: block; animation: pageIn 0.3s ease-out; }
+        @keyframes pageIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .ios-blur { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.4); }
+        .gradient-blue { background: linear-gradient(135deg, var(--primary), var(--accent)); }
+        
+        .camera-box { width: 300px; height: 300px; border-radius: 40px; background: #000; overflow: hidden; position: relative; border: 6px solid white; box-shadow: 0 20px 40px rgba(0,0,0,0.1); margin: auto; }
+        .scan-line { position: absolute; width: 100%; height: 4px; background: #3b82f6; top: 0; animation: scanMove 2.5s infinite ease-in-out; z-index: 10; box-shadow: 0 0 15px #3b82f6; }
+        @keyframes scanMove { 0%, 100% { top: 0%; } 50% { top: 100%; } }
+
+        #loader { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 9999; flex-direction: column; align-items: center; justify-content: center; color: white; }
+        .toast { position: fixed; top: -100px; left: 50%; transform: translateX(-50%); background: #1e293b; color: white; padding: 12px 24px; border-radius: 20px; font-size: 11px; font-weight: 800; z-index: 10000; transition: 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .toast.show { top: 30px; }
+        
+        .flash-capture { animation: flashAnim 0.3s ease-out; }
+        @keyframes flashAnim { 0% { background: white; opacity: 0.8; } 100% { opacity: 0; } }
+    </style>
+</head>
+<body>
+
+    <div id="toast" class="toast">Notifikasi</div>
+    <div id="loader">
+        <div class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p id="loader-text" class="text-[10px] font-black uppercase tracking-widest">Memuat AI...</p>
+    </div>
+
+    <div id="home-page" class="page active">
+        <header class="gradient-blue pt-14 pb-20 px-6 rounded-b-[3.5rem] shadow-2xl relative text-center">
+            <h2 class="text-white font-black text-2xl tracking-tighter italic">Daftar Wajah V6</h2>
+            <p class="text-blue-100/70 text-[9px] font-bold uppercase tracking-[0.3em] mt-1">Sistem Biometrik Pegawai</p>
+        </header>
+        <main class="-mt-10 px-6 space-y-4">
+            <div class="ios-blur p-6 rounded-[2.5rem] shadow-xl flex flex-col gap-4">
+                <div class="flex items-center justify-between px-2">
+                    <p class="text-[10px] font-black text-slate-400 uppercase">Total Terdaftar</p>
+                    <span id="stat-count" class="text-xl font-black text-blue-600">0</span>
+                </div>
+                <button onclick="navigateTo('enroll-page')" class="gradient-blue text-white p-5 rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-all">Daftar Wajah Baru</button>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div onclick="navigateTo('data-page')" class="ios-blur p-6 rounded-[2rem] text-center cursor-pointer active:scale-95 transition-all">
+                    <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-2 text-blue-600 font-bold text-xl shadow-inner">📋</div>
+                    <p class="text-[9px] font-black uppercase text-slate-500">Data Wajah</p>
+                </div>
+                <div onclick="navigateTo('sync-page')" class="ios-blur p-6 rounded-[2rem] text-center cursor-pointer active:scale-95 transition-all">
+                    <div class="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-2 text-emerald-600 font-bold text-xl shadow-inner">🔄</div>
+                    <p class="text-[9px] font-black uppercase text-slate-500">Sinkronisasi</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="enroll-page" class="page">
+        <header class="p-8 text-center">
+            <h2 class="font-black text-slate-800 text-xl tracking-tight uppercase">Registrasi Wajah</h2>
+            <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Multi-Angle Biometric Scan</p>
+        </header>
+        <main class="px-6 flex flex-col gap-5">
+            <div class="camera-box">
+                <div id="cam-flash" class="absolute inset-0 z-50 pointer-events-none"></div>
+                <div class="scan-line"></div>
+                <video id="webcam" autoplay playsinline muted class="w-full h-full object-cover"></video>
+                <canvas id="face-overlay" class="absolute inset-0 pointer-events-none"></canvas>
+            </div>
+
+            <div class="ios-blur p-6 rounded-[2.5rem] shadow-lg space-y-4">
+                <div class="flex gap-2 mb-2">
+                    <button onclick="switchCamera()" class="flex-1 bg-slate-100 p-3 rounded-xl text-[9px] font-black uppercase shadow-sm">🔄 Ganti Kamera</button>
+                    <div id="quality-badge" class="flex-1 bg-slate-100 p-3 rounded-xl text-[9px] font-black uppercase text-center shadow-sm">Quality: -</div>
+                </div>
+                <input type="text" id="reg-nama" placeholder="NAMA LENGKAP" class="w-full bg-slate-50 p-4 rounded-2xl font-bold text-sm outline-none border border-slate-100 focus:ring-2 ring-blue-500 transition-all">
+                <input type="number" id="reg-nip" placeholder="NIP / NOMOR ID" class="w-full bg-slate-50 p-4 rounded-2xl font-bold text-sm outline-none border border-slate-100 focus:ring-2 ring-blue-500 transition-all">
+                
+                <div id="step-guide" class="text-center p-3 bg-blue-50 rounded-2xl border border-blue-100">
+                    <p id="guide-text" class="text-[10px] font-black text-blue-600 uppercase">1. Posisikan Wajah Lurus</p>
+                </div>
+
+                <button id="btn-capture" onclick="startEnrollment()" class="w-full gradient-blue text-white p-5 rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-all">Ambil Sampel Wajah</button>
+            </div>
+        </main>
+    </div>
+
+    <div id="data-page" class="page">
+        <header class="gradient-blue p-8 text-white text-center rounded-b-[3rem] shadow-lg">
+            <h2 class="font-black text-xl uppercase tracking-widest">Database Wajah</h2>
+        </header>
+        <main class="p-6 space-y-3" id="data-list"></main>
+    </div>
+
+    <div id="sync-page" class="page">
+        <header class="gradient-blue p-8 text-white text-center rounded-b-[3rem] shadow-lg">
+            <h2 class="font-black text-xl uppercase tracking-widest">Sinkronisasi</h2>
+        </header>
+        <main class="p-6 space-y-4">
+            <div class="ios-blur p-6 rounded-[2rem] shadow-xl text-center border border-white">
+                <p class="text-[10px] font-black text-slate-400 uppercase mb-4 tracking-widest">Cloud Transfer (GAS)</p>
+                <button onclick="syncToGAS()" class="w-full gradient-blue text-white p-4 rounded-2xl font-black text-[10px] uppercase tracking-widest mb-2 shadow-md">Kirim ke Server</button>
+            </div>
+            <div class="ios-blur p-6 rounded-[2rem] shadow-xl text-center border border-white">
+                <p class="text-[10px] font-black text-slate-400 uppercase mb-4 tracking-widest">Local Management</p>
+                <button onclick="exportJSON()" class="w-full bg-slate-800 text-white p-4 rounded-2xl font-black text-[10px] uppercase tracking-widest mb-2 shadow-md">Export JSON</button>
+                <label class="block w-full bg-slate-200 text-slate-600 p-4 rounded-2xl font-black text-[10px] uppercase tracking-widest cursor-pointer hover:bg-slate-300 transition-colors shadow-sm text-center">
+                    Import JSON
+                    <input type="file" class="hidden" onchange="importJSON(this)">
+                </label>
+            </div>
+        </main>
+    </div>
+
+    <nav class="fixed bottom-0 left-0 right-0 ios-blur px-4 py-5 flex justify-around items-center rounded-t-[2.5rem] shadow-2xl z-[100] border-t border-white" id="main-nav">
+        <button onclick="navigateTo('home-page')" class="flex flex-col items-center gap-1 text-blue-600 nav-btn" data-page="home-page">
+            <div class="text-lg">🏠</div>
+            <span class="text-[7px] font-black uppercase">Beranda</span>
+        </button>
+        <button onclick="navigateTo('enroll-page')" class="flex flex-col items-center gap-1 text-slate-400 nav-btn" data-page="enroll-page">
+            <div class="text-lg">📷</div>
+            <span class="text-[7px] font-black uppercase">Daftar</span>
+        </button>
+        <button onclick="navigateTo('data-page')" class="flex flex-col items-center gap-1 text-slate-400 nav-btn" data-page="data-page">
+            <div class="text-lg">👤</div>
+            <span class="text-[7px] font-black uppercase">Pegawai</span>
+        </button>
+        <button onclick="navigateTo('sync-page')" class="flex flex-col items-center gap-1 text-slate-400 nav-btn" data-page="sync-page">
+            <div class="text-lg">🔄</div>
+            <span class="text-[7px] font-black uppercase">Sync</span>
+        </button>
+    </nav>
+
+    <script>
+        let db;
+        let isModelLoaded = false;
+        let webcamStream = null;
+        let currentFacingMode = 'user';
+        let enrollSteps = [];
+        let API_URL = "https://script.google.com/macros/s/AKfycbz_npv8AhuaPXWQSOi2NT97toBQR2Gqa6n7rmZbUGDhcn0SXU3-AwIRRmI1JItEA_2RnQ/exec";
+
+        const initDB = () => {
+            const request = indexedDB.open("FaceEnrollDB", 1);
+            request.onupgradeneeded = (e) => {
+                const d = e.target.result;
+                if (!d.objectStoreNames.contains("faces")) {
+                    d.createObjectStore("faces", { keyPath: "nip" });
+                }
+            };
+            request.onsuccess = (e) => {
+                db = e.target.result;
+                updateStats();
+            };
+        };
+
+        function navigateTo(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            const targetPage = document.getElementById(pageId);
+            if (targetPage) targetPage.classList.add('active');
+            
+            if (webcamStream && pageId !== 'enroll-page') {
+                webcamStream.getTracks().forEach(t => t.stop());
+                webcamStream = null;
+            }
+
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.replace('text-blue-600', 'text-slate-400');
+                if(btn.getAttribute('data-page') === pageId) btn.classList.replace('text-slate-400', 'text-blue-600');
+            });
+
+            if (pageId === 'enroll-page') startCamera();
+            if (pageId === 'data-page') loadDataWajah();
+            updateStats();
+        }
+
+        async function startCamera() {
+            if (!isModelLoaded) {
+                showLoader("Memuat AI...");
+                const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model/';
+                try {
+                    await Promise.all([
+                        faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
+                        faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+                        faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+                    ]);
+                    isModelLoaded = true;
+                    hideLoader();
+                } catch (err) {
+                    toast("Gagal Memuat Model AI");
+                    return;
+                }
+            }
+
+            const video = document.getElementById('webcam');
+            try {
+                if (webcamStream) {
+                    webcamStream.getTracks().forEach(t => t.stop());
+                }
+                webcamStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: currentFacingMode, width: 640, height: 480 } 
+                });
+                video.srcObject = webcamStream;
+                monitorQuality();
+            } catch (e) {
+                toast("Kamera Gagal Diakses");
+            }
+        }
+
+        function switchCamera() {
+            currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+            startCamera();
+        }
+
+        async function monitorQuality() {
+            const video = document.getElementById('webcam');
+            const badge = document.getElementById('quality-badge');
+            
+            const interval = setInterval(async () => {
+                const enrollPage = document.getElementById('enroll-page');
+                if (!webcamStream || !enrollPage || !enrollPage.classList.contains('active')) {
+                    clearInterval(interval);
+                    return;
+                }
+
+                try {
+                    const detections = await faceapi.detectSingleFace(video).withFaceLandmarks();
+                    if (detections) {
+                        const score = Math.round(detections.detection.score * 100);
+                        badge.innerText = `Quality: ${score}%`;
+                        badge.className = score > 80 ? "flex-1 bg-emerald-100 p-3 rounded-xl text-[9px] font-black uppercase text-emerald-600" : "flex-1 bg-amber-100 p-3 rounded-xl text-[9px] font-black uppercase text-amber-600";
+                    } else {
+                        badge.innerText = "Quality: -";
+                        badge.className = "flex-1 bg-slate-100 p-3 rounded-xl text-[9px] font-black uppercase";
+                    }
+                } catch (e) { }
+            }, 1000);
+        }
+
+        async function startEnrollment() {
+            const nama = document.getElementById('reg-nama').value.trim();
+            const nip = document.getElementById('reg-nip').value.trim();
+            const btn = document.getElementById('btn-capture');
+            const video = document.getElementById('webcam');
+
+            if (!nama || !nip) return toast("Isi Nama & NIP!");
+            
+            btn.disabled = true;
+            btn.classList.add('opacity-50');
+            enrollSteps = [];
+
+            try {
+                document.getElementById('guide-text').innerText = "1. Posisikan Wajah Lurus";
+                const desc1 = await captureWithRetry(video);
+                if (!desc1) throw new Error("Gagal ambil sampel lurus");
+                enrollSteps.push(desc1);
+                visualFlash();
+                
+                confetti({ particleCount: 30, origin: { x: 0.2 } });
+                document.getElementById('guide-text').innerText = "2. Hadap Miring Kiri";
+                await sleep(2500);
+                const desc2 = await captureWithRetry(video);
+                if (!desc2) throw new Error("Gagal ambil sampel kiri");
+                enrollSteps.push(desc2);
+                visualFlash();
+
+                confetti({ particleCount: 30, origin: { x: 0.8 } });
+                document.getElementById('guide-text').innerText = "3. Hadap Miring Kanan";
+                await sleep(2500);
+                const desc3 = await captureWithRetry(video);
+                if (!desc3) throw new Error("Gagal ambil sampel kanan");
+                enrollSteps.push(desc3);
+                visualFlash();
+
+                saveEnrollment(nama, nip);
+            } catch (err) {
+                toast(err.message);
+                document.getElementById('guide-text').innerText = "Gagal. Coba Lagi.";
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('opacity-50');
+            }
+        }
+
+        async function captureWithRetry(video, retries = 5) {
+            for(let i=0; i < retries; i++) {
+                const det = await faceapi.detectSingleFace(video).withFaceLandmarks().withFaceDescriptor();
+                if (det) return Array.from(det.descriptor);
+                await sleep(600);
+            }
+            return null;
+        }
+
+        function visualFlash() {
+            const flash = document.getElementById('cam-flash');
+            flash.classList.add('flash-capture');
+            setTimeout(() => flash.classList.remove('flash-capture'), 300);
+        }
+
+        function saveEnrollment(nama, nip) {
+            showLoader("Menyimpan...");
+            const data = {
+                nama, nip,
+                descriptors: enrollSteps,
+                timestamp: new Date().toISOString()
+            };
+
+            const tx = db.transaction("faces", "readwrite");
+            const store = tx.objectStore("faces");
+            
+            const request = store.put(data);
+            request.onsuccess = () => {
+                hideLoader();
+                confetti({ particleCount: 150 });
+                toast("REGISTRASI BERHASIL!");
+                setTimeout(() => navigateTo('home-page'), 1000);
+            };
+            request.onerror = () => {
+                hideLoader();
+                toast("Gagal Simpan ke DB");
+            };
+        }
+
+        function loadDataWajah() {
+            const list = document.getElementById('data-list');
+            list.innerHTML = "";
+            const tx = db.transaction("faces", "readonly");
+            tx.objectStore("faces").getAll().onsuccess = (e) => {
+                const results = e.target.result;
+                if(results.length === 0) {
+                    list.innerHTML = "<p class='text-center text-[10px] text-slate-400 py-10 uppercase tracking-widest'>Data Kosong</p>";
+                    return;
+                }
+                results.reverse().forEach(f => {
+                    list.innerHTML += `
+                        <div class="ios-blur p-5 rounded-3xl flex items-center justify-between shadow-sm animate-[pageIn_0.3s_ease-out]">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center font-black text-blue-600 text-xs shadow-inner">${f.nama[0]}</div>
+                                <div>
+                                    <h4 class="text-xs font-black text-slate-800">${f.nama}</h4>
+                                    <p class="text-[9px] font-bold text-slate-400">NIP: ${f.nip}</p>
+                                </div>
+                            </div>
+                            <button onclick="hapusWajah('${f.nip}')" class="text-rose-500 p-2 font-black text-[9px] uppercase hover:bg-rose-50 rounded-xl transition-colors">Hapus</button>
+                        </div>
+                    `;
+                });
+            };
+        }
+
+        function hapusWajah(nip) {
+            if (confirm("Hapus data wajah ini dari database lokal?")) {
+                const tx = db.transaction("faces", "readwrite");
+                tx.objectStore("faces").delete(nip).onsuccess = () => {
+                    toast("Data Berhasil Dihapus");
+                    loadDataWajah();
+                    updateStats();
+                };
+            }
+        }
+
+        function exportJSON() {
+            const tx = db.transaction("faces", "readonly");
+            tx.objectStore("faces").getAll().onsuccess = (e) => {
+                const data = e.target.result;
+                if(data.length === 0) return toast("Database Kosong");
+                const blob = new Blob([JSON.stringify(data)], {type: 'application/json'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `FaceEnroll_Export_${new Date().getTime()}.json`;
+                a.click();
+                toast("Export Berhasil");
+            };
+        }
+
+        function importJSON(input) {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    const tx = db.transaction("faces", "readwrite");
+                    const store = tx.objectStore("faces");
+                    importedData.forEach(item => store.put(item));
+                    tx.oncomplete = () => {
+                        toast("Import Berhasil!");
+                        updateStats();
+                    };
+                } catch (err) { toast("Format File Salah!"); }
+            };
+            reader.readAsText(file);
+        }
+
+        async function syncToGAS() {
+            if (!API_URL || API_URL.includes("PASTE_URL")) return toast("URL API Belum Diset!");
+            showLoader("Menghubungkan...");
+            
+            const tx = db.transaction("faces", "readonly");
+            tx.objectStore("faces").getAll().onsuccess = async (e) => {
+                const allData = e.target.result;
+                if(allData.length === 0) {
+                    hideLoader();
+                    return toast("Data Kosong!");
+                }
+                
+                try {
+                    const response = await fetch(API_URL, {
+                        method: "POST",
+                        mode: "no-cors",
+                        headers: {"Content-Type": "application/json"},
+                        body: JSON.stringify({ action: "sync_faces", data: allData })
+                    });
+                    
+                    hideLoader();
+                    toast("Data Terkirim (No-Cors)");
+                } catch (err) {
+                    hideLoader();
+                    toast("Gagal Sinkron");
+                    console.error(err);
+                }
+            };
+        }
+
+        function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+        function showLoader(t) { 
+            const loader = document.getElementById('loader');
+            const loaderText = document.getElementById('loader-text');
+            if (loaderText) loaderText.innerText = t; 
+            if (loader) loader.style.display = 'flex'; 
+        }
+        function hideLoader() { 
+            const loader = document.getElementById('loader');
+            if (loader) loader.style.display = 'none'; 
+        }
+        function toast(m) { 
+            const t = document.getElementById('toast'); 
+            if (t) {
+                t.innerText = m; t.classList.add('show'); 
+                setTimeout(() => t.classList.remove('show'), 3000); 
+            }
+        }
+        function updateStats() {
+            if(!db) return;
+            const tx = db.transaction("faces", "readonly");
+            tx.objectStore("faces").count().onsuccess = (e) => {
+                const statCount = document.getElementById('stat-count');
+                if (statCount) statCount.innerText = e.target.result;
+            };
+        }
+
+        window.onload = initDB;
+    </script>
+</body>
+</html>
