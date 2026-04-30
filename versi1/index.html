@@ -36,8 +36,9 @@
         .scan-line { position: absolute; width: 100%; height: 2px; background: var(--pkm-accent); top: 0; left: 0; box-shadow: 0 0 15px 2px var(--pkm-accent); animation: scanMove 2s infinite ease-in-out; z-index: 10; }
         @keyframes scanMove { 0%, 100% { top: 0%; } 50% { top: 100%; } }
 
-        #reg-popup { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 9000; backdrop-filter: blur(10px); align-items: center; justify-content: center; }
-        #reg-popup.active { display: flex; }
+        #reg-popup, #security-popup { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 9000; backdrop-filter: blur(10px); align-items: center; justify-content: center; }
+        #reg-popup.active, #security-popup.active { display: flex; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
         .excel-table { border-collapse: collapse; width: 100%; background: white; font-size: 11px; }
         .excel-table th { background: #f8fafc; border-bottom: 2px solid #e2e8f0; padding: 12px 8px; color: #64748b; font-weight: 800; text-align: center; }
@@ -55,6 +56,17 @@
     <div id="global-loader">
         <div class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
         <p id="loader-text" class="text-[10px] font-black uppercase tracking-[0.2em]">Sistem Memproses...</p>
+    </div>
+
+    <div id="security-popup">
+        <div class="w-[85%] max-w-[350px] bg-white rounded-[3rem] p-8 text-center shadow-2xl transform scale-100 transition-transform">
+            <div class="w-20 h-20 bg-rose-100 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg class="w-10 h-10" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+            </div>
+            <h3 class="text-slate-800 font-black text-xl uppercase tracking-tighter mb-2">Akses Ditolak</h3>
+            <p id="security-msg" class="text-slate-500 text-xs font-bold leading-relaxed mb-8 uppercase tracking-wide">Anda sudah tercatat melakukan absensi pada sesi ini.</p>
+            <button onclick="closeSecurityPopup()" class="w-full bg-slate-900 text-white p-5 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em]">Kembali ke Beranda</button>
+        </div>
     </div>
 
     <div id="reg-popup">
@@ -84,7 +96,7 @@
             <div class="absolute -top-10 -right-10 w-44 h-44 bg-white/10 rounded-full blur-3xl"></div>
             <div class="relative z-10 flex justify-between items-start">
                 <div>
-                    <p class="text-blue-100/70 text-[10px] font-black uppercase tracking-[0.3em] mb-1">Monster Enterprise V6 PRO</p>
+                    <p class="text-blue-100/70 text-[10px] font-black uppercase tracking-[0.3em] mb-1">UPTD PUSKESMAS SAMPANAHAN</p>
                     <h1 class="shimmer font-black text-4xl tracking-tighter uppercase leading-none">MASOOK</h1>
                     <div class="flex items-center gap-2 mt-3">
                         <span id="sync-status-dot" class="w-2.5 h-2.5 bg-slate-400 rounded-full"></span>
@@ -195,7 +207,12 @@
                 <input type="text" id="reg-nama" placeholder="Nama Lengkap Staf" class="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold text-sm outline-none">
                 <div class="grid grid-cols-2 gap-3">
                     <input type="number" id="reg-nip" placeholder="Nomor ID / NIP" class="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold text-sm outline-none">
-                    <input type="number" id="reg-pin" placeholder="PIN (4 Digit)" class="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold text-sm outline-none" maxlength="4">
+                    <div class="relative">
+                        <input type="number" id="reg-pin" placeholder="PIN (4 Digit)" class="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold text-sm outline-none pr-12" maxlength="4">
+                        <button onclick="generateRandomPin()" class="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-blue-600 hover:text-blue-800 transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                        </button>
+                    </div>
                 </div>
                 <button onclick="openRegPopup()" class="masook-gradient text-white p-5 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] shadow-lg active:scale-95 transition-all mt-2">
                     Lanjut Rekam Wajah
@@ -653,6 +670,16 @@
         // ==========================================
         // ATTENDANCE CORE
         // ==========================================
+        function showSecurityPopup(msg) {
+            document.getElementById('security-msg').innerText = msg;
+            document.getElementById('security-popup').classList.add('active');
+        }
+
+        function closeSecurityPopup() {
+            document.getElementById('security-popup').classList.remove('active');
+            navigateTo('home-page');
+        }
+
         async function checkDuplicateAbsen(nip, status) {
             return new Promise((resolve) => {
                 const today = new Date().toLocaleDateString('id-ID');
@@ -683,9 +710,10 @@
             const isDuplicate = await checkDuplicateAbsen(staf.nip, statusAbsen);
             if (isDuplicate) {
                 const panggilan = staf.nama.split(' ')[0];
-                speak(`Mohon maaf ${panggilan}. Anda sudah tercatat absen ${statusAbsen} hari ini.`);
-                alert(`GAGAL! ${staf.nama} sudah melakukan Absen ${statusAbsen} hari ini.`);
-                navigateTo('home-page');
+                hideLoader(); 
+                if (webcamStream) { webcamStream.getTracks().forEach(track => track.stop()); webcamStream = null; }
+                speak(`Mohon maaf ${panggilan}. Sistem mendeteksi Anda sudah melakukan absen ${statusAbsen} hari ini.`);
+                showSecurityPopup(`${staf.nama}, Anda sudah tercatat melakukan absensi ${statusAbsen} hari ini.`);
                 return;
             }
 
@@ -805,8 +833,14 @@
         }
 
         // ==========================================
-        // REGISTRATION 
+        // REGISTRATION & PIN GENERATOR
         // ==========================================
+        function generateRandomPin() {
+            const pin = Math.floor(1000 + Math.random() * 9000);
+            document.getElementById('reg-pin').value = pin;
+            toast("PIN ACAK: " + pin);
+        }
+
         function openRegPopup() {
             const nama = document.getElementById('reg-nama').value.trim();
             const nip = document.getElementById('reg-nip').value.trim();
@@ -998,7 +1032,7 @@
             
             if (dist <= CONFIG.radius) {
                 canScan = true; 
-                label.innerText = "Area Kantor (" + Math.round(dist) + "m)"; 
+                label.innerText = "Area Puskesmas (" + Math.round(dist) + "m)"; 
                 label.className = "text-emerald-600 text-[10px] font-black uppercase"; 
                 dot.className = "w-2.5 h-2.5 bg-emerald-500 rounded-full shadow-[0_0_10px_#10b981]";
             } else {
@@ -1020,23 +1054,14 @@
         function hideLoader() { document.getElementById('global-loader').style.display = 'none'; }
         function updateRadiusLabel() { document.getElementById('radius-val').innerText = document.getElementById('radius-slider').value + "m"; }
         
-        // ==========================================
-        // SECURITY LAYER (CORE VALIDATION)
-        // ==========================================
         function handleScanButton() { 
             const sessionStatus = document.getElementById('session-tag').innerText;
-            
-            // 1. Pengecekan Sesi (Kecuali Mode Ujicoba)
             if (!CONFIG.testMode && sessionStatus === "Sesi Tutup") {
                 return alert("Absensi Sedang Tutup.");
             }
-            
-            // 2. Pengecekan GPS (Kecuali Mode Ujicoba)
             if (!CONFIG.testMode && CONFIG.enabled && !canScan) {
                 return alert("Akses Ditolak! Anda berada di luar radius kantor.");
             }
-            
-            // Lolos Validasi Keamanan
             navigateTo('face-page'); 
         }
 
