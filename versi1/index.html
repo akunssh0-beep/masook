@@ -430,7 +430,12 @@
     </nav>
 
     <script>
-        let API_URL = localStorage.getItem("MASOOK_API_URL") || ""; 
+        // API URL updated per instruction
+        let API_URL = "https://script.google.com/macros/s/AKfycbz_npv8AhuaPXWQSOi2NT97toBQR2Gqa6n7rmZbUGDhcn0SXU3-AwIRRmI1JItEA_2RnQ/exec"; 
+        
+        // Simpan URL baru ke localStorage agar sinkron dengan input setting
+        localStorage.setItem("MASOOK_API_URL", API_URL);
+
         let db;
         let isModelLoaded = false;
         let webcamStream = null;
@@ -1087,6 +1092,19 @@
         }
 
         async function handleFullReset() { if(confirm("Reset seluruh data?")) { indexedDB.deleteDatabase("MasookEnterpriseDB"); location.reload(); } }
+
+        function handleBackup() {
+            dbAction("absensi", "readonly", store => {
+                store.getAll().onsuccess = (e) => {
+                    const blob = new Blob([JSON.stringify(e.target.result)], {type: "application/json"});
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `Backup_Masook_${new Date().toISOString().split('T')[0]}.json`;
+                    a.click();
+                };
+            });
+        }
 
         function exportAbsensiToExcel() {
             dbAction("absensi", "readonly", store => {
