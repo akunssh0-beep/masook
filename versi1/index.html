@@ -448,48 +448,58 @@
             friday: { in: "08:00", inLimit: "10:30", out: "11:00", outLimit: "13:00" }
         };
 
-        // ==========================================
-        // CLOUD SYNC: FETCH DATA FROM SHEETS TO IDB
-        // ==========================================
+        // ========================================================
+        // CLOUD SYNC: FETCH STAF & CONFIG FROM SHEETS TO LOCAL IDB
+        // ========================================================
         async function syncCloudToLocal() {
             if (!isOnlineMode) return;
             console.log("Memulai Sinkronisasi Cloud ke Lokal...");
             
             try {
-                const res = await cloudCall({ action: "get_staf" });
-                if (res && res.success && res.data) {
-                    const cloudStaff = res.data;
-                    
+                // 1. Sinkronasi Data Staf
+                const resStaf = await cloudCall({ action: "get_staf" });
+                if (resStaf && resStaf.success && resStaf.data) {
+                    const cloudStaff = resStaf.data;
                     dbAction("staff", "readwrite", store => {
-                        // Ambil semua data lokal untuk perbandingan
                         store.getAll().onsuccess = (e) => {
                             const localStaff = e.target.result;
-                            
                             cloudStaff.forEach(stafCloud => {
-                                // Cek apakah staf sudah ada di lokal berdasarkan NIP
                                 const existing = localStaff.find(s => String(s.nip) === String(stafCloud.nip));
-                                
+                                if (typeof stafCloud.descriptorWajah === 'string') {
+                                    stafCloud.descriptorWajah = JSON.parse(stafCloud.descriptorWajah);
+                                }
                                 if (!existing) {
-                                    // Jika belum ada, tambahkan ke IndexedDB
-                                    // Pastikan descriptorWajah diubah kembali ke array jika berbentuk string
-                                    if (typeof stafCloud.descriptorWajah === 'string') {
-                                        stafCloud.descriptorWajah = JSON.parse(stafCloud.descriptorWajah);
-                                    }
                                     store.add(stafCloud);
                                 } else {
-                                    // Jika sudah ada, update datanya (opsional, untuk sinkronisasi nama/pin)
-                                    stafCloud.id = existing.id; // Gunakan ID lokal yang sama
-                                    if (typeof stafCloud.descriptorWajah === 'string') {
-                                        stafCloud.descriptorWajah = JSON.parse(stafCloud.descriptorWajah);
-                                    }
+                                    stafCloud.id = existing.id;
                                     store.put(stafCloud);
                                 }
                             });
-                            console.log(`Sinkronasi Selesai: ${cloudStaff.length} Staf diproses.`);
-                            updateStats();
                         };
                     });
                 }
+
+                // 2. Sinkronasi Konfigurasi Sistem (Ambil Konfigurasi)
+                const resConfig = await cloudCall({ action: "get_setting" });
+                if (resConfig && resConfig.success && resConfig.data) {
+                    console.log("Pengaturan Cloud Ditemukan, Memperbarui Lokal...");
+                    
+                    // Otomatisasi Simpan ke variabel CONFIG dan indexedDB
+                    const cloudConfig = resConfig.data;
+                    CONFIG = { ...CONFIG, ...cloudConfig };
+                    
+                    dbAction("setting", "readwrite", store => {
+                        store.put({ id: "main", ...CONFIG }).onsuccess = () => {
+                            // Update UI segera setelah data disimpan
+                            applyUiConfig();
+                            console.log("Konfigurasi Lokal Berhasil Disinkronkan dengan Cloud.");
+                        };
+                    });
+                }
+
+                console.log(`Sinkronasi Cloud-Lokal Selesai.`);
+                updateStats();
+
             } catch (err) {
                 console.error("Gagal Sync Cloud ke Lokal:", err);
             }
@@ -923,7 +933,6 @@
             
             if (pageId === 'face-page') startAuthWebcam();
             if (pageId === 'petugas-page') {
-                // SINKRONASI OTOMATIS SAAT HALAMAN STAF DIBUKA
                 syncCloudToLocal();
                 loadStafList();
             }
