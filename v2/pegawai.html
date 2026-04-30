@@ -464,15 +464,11 @@
             friday: { in: "08:00", inLimit: "10:30", out: "11:00", outLimit: "13:00" }
         };
 
-        // ========================================================
-        // SINKRONASI OTOMATIS: PEGAWAI MENGIKUTI PENGATURAN ADMIN
-        // ========================================================
         async function syncCloudToLocal() {
             if (!isOnlineMode) return;
             console.log("Memeriksa Pembaruan Konfigurasi...");
             
             try {
-                // 1. Sinkronasi Konfigurasi Sistem (Admin Control)
                 const resConfig = await cloudCall({ action: "get_setting" });
                 if (resConfig && resConfig.success && resConfig.data) {
                     const cloudConfig = resConfig.data;
@@ -481,16 +477,14 @@
                     dbAction("setting", "readwrite", store => {
                         store.put({ id: "main", ...CONFIG }).onsuccess = () => {
                             applyUiConfig();
-                            console.log("Pengaturan Lokal diperbarui otomatis dari Server.");
                         };
                     });
                 }
 
-                // 2. Sinkronasi Data Staf (Jika ada staf baru di admin lain)
                 const resStaf = await cloudCall({ action: "get_staf" });
                 if (resStaf && resStaf.success && resStaf.data) {
                     dbAction("staff", "readwrite", store => {
-                        store.clear().onsuccess = () => { // Segarkan database lokal
+                        store.clear().onsuccess = () => {
                             resStaf.data.forEach(stafCloud => {
                                 if (typeof stafCloud.descriptorWajah === 'string') {
                                     stafCloud.descriptorWajah = JSON.parse(stafCloud.descriptorWajah);
@@ -504,9 +498,6 @@
             } catch (err) { console.error("Sync Error:", err); }
         }
 
-        // ========================================================
-        // FITUR PROTEKSI ADMIN (LOCK SYSTEM)
-        // ========================================================
         function openAdminLock(targetPage) {
             targetPageAfterLock = targetPage;
             document.getElementById('admin-pin-input').value = "";
@@ -524,7 +515,6 @@
             if (pinInput.length < 4) return toast("PIN Tidak Lengkap");
 
             showLoader("Memverifikasi...");
-            // Cek PIN di database staf lokal (Hanya Admin yang punya akses)
             dbAction("staff", "readonly", store => {
                 let found = false;
                 store.openCursor().onsuccess = (e) => {
@@ -544,11 +534,8 @@
             });
         }
 
-        // Override fungsi navigasi untuk menambahkan proteksi
         function navigateTo(pageId) {
-            // Daftar halaman yang butuh proteksi PIN
             const protectedPages = ['setting-page', 'petugas-page', 'registrasi-page', 'akun-page'];
-            
             if (protectedPages.includes(pageId)) {
                 openAdminLock(pageId);
             } else {
@@ -560,7 +547,6 @@
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             document.getElementById(pageId).classList.add('active');
             
-            // Reset navigasi warna icon
             document.querySelectorAll('nav button').forEach(btn => btn.className = "flex flex-col items-center gap-1 text-slate-400");
             
             if (webcamStream) { webcamStream.getTracks().forEach(track => track.stop()); webcamStream = null; }
@@ -599,7 +585,6 @@
                 loadSavedConfig();
                 checkApiConnectivity().then(() => {
                     syncCloudToLocal();
-                    // Sinkronisasi otomatis setiap 30 detik agar perubahan admin langsung terasa di hp pegawai
                     setInterval(syncCloudToLocal, 30000); 
                 });
                 updateStats();
@@ -888,6 +873,9 @@
 
         async function startAuthWebcam() {
             await loadModels();
+            // PENTING: Pastikan sinkronisasi terbaru sudah masuk sebelum scanner jalan
+            if (isOnlineMode) await syncCloudToLocal();
+
             const video = document.getElementById('webcam'), status = document.getElementById('face-status-text'), prog = document.getElementById('scan-progress');
             try {
                 webcamStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
@@ -895,7 +883,11 @@
                 dbAction("staff", "readonly", store => {
                     store.getAll().onsuccess = (e) => {
                         const staffs = e.target.result;
-                        if (!staffs.length) return alert("Database Kosong!");
+                        if (!staffs || staffs.length === 0) {
+                            alert("Daftar Petugas Kosong! Pastikan Admin sudah mendaftarkan wajah dan perangkat Anda terhubung internet.");
+                            executeNavigation('home-page');
+                            return;
+                        }
                         const labeled = staffs.map(s => {
                             const desc = new Float32Array(s.descriptorWajah);
                             return new faceapi.LabeledFaceDescriptors(s.nip, [desc]);
