@@ -430,12 +430,8 @@
     </nav>
 
     <script>
-        // API URL updated per instruction
-        let API_URL = "https://script.google.com/macros/s/AKfycbz_npv8AhuaPXWQSOi2NT97toBQR2Gqa6n7rmZbUGDhcn0SXU3-AwIRRmI1JItEA_2RnQ/exec"; 
+        let API_URL = localStorage.getItem("MASOOK_API_URL") || "https://script.google.com/macros/s/AKfycbz_npv8AhuaPXWQSOi2NT97toBQR2Gqa6n7rmZbUGDhcn0SXU3-AwIRRmI1JItEA_2RnQ/exec"; 
         
-        // Simpan URL baru ke localStorage agar sinkron dengan input setting
-        localStorage.setItem("MASOOK_API_URL", API_URL);
-
         let db;
         let isModelLoaded = false;
         let webcamStream = null;
@@ -453,31 +449,66 @@
         };
 
         // ==========================================
-        // KONEKSI CLOUD (GOOGLE APPS SCRIPT)
+        // CLOUD SYNC: FETCH DATA FROM SHEETS TO IDB
         // ==========================================
-        async function cloudCall(payload) {
-            console.log("Cloud Request:", payload.action);
-            if (!API_URL || !API_URL.startsWith("https")) {
-                return { success: false, message: "URL API Tidak Valid" };
+        async function syncCloudToLocal() {
+            if (!isOnlineMode) return;
+            console.log("Memulai Sinkronisasi Cloud ke Lokal...");
+            
+            try {
+                const res = await cloudCall({ action: "get_staf" });
+                if (res && res.success && res.data) {
+                    const cloudStaff = res.data;
+                    
+                    dbAction("staff", "readwrite", store => {
+                        // Ambil semua data lokal untuk perbandingan
+                        store.getAll().onsuccess = (e) => {
+                            const localStaff = e.target.result;
+                            
+                            cloudStaff.forEach(stafCloud => {
+                                // Cek apakah staf sudah ada di lokal berdasarkan NIP
+                                const existing = localStaff.find(s => String(s.nip) === String(stafCloud.nip));
+                                
+                                if (!existing) {
+                                    // Jika belum ada, tambahkan ke IndexedDB
+                                    // Pastikan descriptorWajah diubah kembali ke array jika berbentuk string
+                                    if (typeof stafCloud.descriptorWajah === 'string') {
+                                        stafCloud.descriptorWajah = JSON.parse(stafCloud.descriptorWajah);
+                                    }
+                                    store.add(stafCloud);
+                                } else {
+                                    // Jika sudah ada, update datanya (opsional, untuk sinkronisasi nama/pin)
+                                    stafCloud.id = existing.id; // Gunakan ID lokal yang sama
+                                    if (typeof stafCloud.descriptorWajah === 'string') {
+                                        stafCloud.descriptorWajah = JSON.parse(stafCloud.descriptorWajah);
+                                    }
+                                    store.put(stafCloud);
+                                }
+                            });
+                            console.log(`Sinkronasi Selesai: ${cloudStaff.length} Staf diproses.`);
+                            updateStats();
+                        };
+                    });
+                }
+            } catch (err) {
+                console.error("Gagal Sync Cloud ke Lokal:", err);
             }
+        }
+
+        async function cloudCall(payload) {
+            if (!API_URL || !API_URL.startsWith("https")) return { success: false, message: "URL API Tidak Valid" };
             try {
                 const res = await fetch(API_URL, {
                     method: "POST",
                     headers: { "Content-Type": "text/plain;charset=utf-8" },
                     body: JSON.stringify(payload)
                 });
-                const data = await res.json();
-                console.log("Cloud Response:", data);
-                return data;
+                return await res.json();
             } catch (err) {
-                console.error("Cloud Error:", err.message);
                 return { success: false, message: err.message };
             }
         }
 
-        // ==========================================
-        // CORE DATABASE
-        // ==========================================
         const initDB = () => {
             const request = indexedDB.open("MasookEnterpriseDB", 9);
             request.onupgradeneeded = (e) => {
@@ -489,7 +520,10 @@
             request.onsuccess = (e) => {
                 db = e.target.result;
                 loadSavedConfig();
-                checkApiConnectivity();
+                checkApiConnectivity().then(() => {
+                    // SINKRONASI OTOMATIS SAAT APLIKASI DIBUKA
+                    syncCloudToLocal();
+                });
                 updateStats();
             };
         };
@@ -500,9 +534,6 @@
             callback(store);
         };
 
-        // ==========================================
-        // CONFIG & API LOGIC
-        // ==========================================
         function loadSavedConfig() {
             if (API_URL) document.getElementById('api-url-input').value = API_URL;
             dbAction("setting", "readonly", store => {
@@ -629,9 +660,6 @@
             }
         }
 
-        // ==========================================
-        // SISTEM SYNC
-        // ==========================================
         async function autoSyncPendingData() {
             if (!isOnlineMode || isSyncing) return;
             isSyncing = true;
@@ -672,9 +700,6 @@
             });
         }
 
-        // ==========================================
-        // ATTENDANCE CORE
-        // ==========================================
         function showSecurityPopup(msg) {
             document.getElementById('security-msg').innerText = msg;
             document.getElementById('security-popup').classList.add('active');
@@ -707,10 +732,7 @@
 
         async function submitAbsensi(staf, metode) {
             let statusAbsen = document.getElementById('session-tag').innerText.replace("Sesi ", "");
-            
-            if (statusAbsen === "Pulang (Tutup)" || statusAbsen === "Tutup") {
-                statusAbsen = "Pulang"; 
-            }
+            if (statusAbsen === "Pulang (Tutup)" || statusAbsen === "Tutup") statusAbsen = "Pulang"; 
 
             const isDuplicate = await checkDuplicateAbsen(staf.nip, statusAbsen);
             if (isDuplicate) {
@@ -749,7 +771,6 @@
                     }
                     hideLoader(); 
                     confetti({ particleCount: 200, spread: 70, origin: { y: 0.6 } }); 
-                    
                     speak(`Terima kasih ${staf.nama.split(' ')[0]}. Absen ${statusAbsen} berhasil.`);
                     toast("ABSENSI TERCATAT!");
                     setTimeout(() => navigateTo('home-page'), 1500);
@@ -761,22 +782,17 @@
             const select = document.getElementById('manual-staf-select');
             const nip = select.value;
             if (!nip) return toast("Pilih Nama");
-            
             dbAction("staff", "readonly", store => {
                 store.openCursor().onsuccess = (e) => {
                     const cursor = e.target.result;
                     if (cursor) {
-                        if (cursor.value.nip === nip) {
-                            submitAbsensi(cursor.value, "Manual / Admin");
-                        } else cursor.continue();
+                        if (cursor.value.nip === nip) submitAbsensi(cursor.value, "Manual / Admin");
+                        else cursor.continue();
                     }
                 };
             });
         }
 
-        // ==========================================
-        // FACE RECOGNITION UTILS
-        // ==========================================
         async function loadModels() { 
             if (isModelLoaded) return; 
             showLoader("Menyiapkan AI..."); 
@@ -804,12 +820,10 @@
                     store.getAll().onsuccess = (e) => {
                         const staffs = e.target.result;
                         if (!staffs.length) return alert("Database Kosong!");
-                        
                         const labeled = staffs.map(s => {
                             const desc = new Float32Array(s.descriptorWajah);
                             return new faceapi.LabeledFaceDescriptors(s.nip, [desc]);
                         });
-                        
                         const matcher = new faceapi.FaceMatcher(labeled, CONFIG.threshold);
                         let tries = 0;
                         const interval = setInterval(async () => {
@@ -828,18 +842,13 @@
                                 clearInterval(interval); 
                                 status.innerText = "GAGAL MENGENALI"; 
                                 document.getElementById('manual-fallback').classList.remove('hidden'); 
-                            } else { 
-                                status.innerText = `Memindai (${tries}/15)...`; 
-                            }
+                            } else status.innerText = `Memindai (${tries}/15)...`; 
                         }, 800);
                     };
                 });
             } catch (e) { toast("Kamera Gagal"); }
         }
 
-        // ==========================================
-        // REGISTRATION & PIN GENERATOR
-        // ==========================================
         function generateRandomPin() {
             const pin = Math.floor(1000 + Math.random() * 9000);
             document.getElementById('reg-pin').value = pin;
@@ -863,39 +872,26 @@
 
         async function startRegWebcam() {
             await loadModels();
-            const video = document.getElementById('reg-webcam');
-            const status = document.getElementById('reg-cam-status');
-            const frame = document.getElementById('face-frame');
-            const template = document.getElementById('face-template');
-            const hint = document.getElementById('template-hint');
-
+            const video = document.getElementById('reg-webcam'), status = document.getElementById('reg-cam-status'), frame = document.getElementById('face-frame'), template = document.getElementById('face-template'), hint = document.getElementById('template-hint');
             try {
                 webcamStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
                 video.srcObject = webcamStream;
                 status.innerText = "Sensor Aktif...";
-
                 detectionInterval = setInterval(async () => {
                     if (!webcamStream) return;
                     const det = await faceapi.detectSingleFace(video).withFaceLandmarks();
                     if (det) {
-                        const box = det.detection.box;
-                        const vW = video.videoWidth, vH = video.videoHeight;
-                        const cX = box.x + box.width / 2, cY = box.y + box.height / 2;
-
+                        const box = det.detection.box, vW = video.videoWidth, vH = video.videoHeight, cX = box.x + box.width / 2, cY = box.y + box.height / 2;
                         let h = "", v = "";
                         if (cX < vW * 0.4) h = "Kiri"; else if (cX > vW * 0.6) h = "Kanan";
                         if (cY < vH * 0.4) v = "Atas"; else if (cY > vH * 0.6) v = "Bawah";
                         let pos = (v + " " + h).trim();
-                        
-                        if (pos !== "") {
-                            frame.style.opacity = '0'; template.style.opacity = '1'; hint.innerText = "Geser ke " + pos;
-                        } else {
+                        if (pos !== "") { frame.style.opacity = '0'; template.style.opacity = '1'; hint.innerText = "Geser ke " + pos; } 
+                        else {
                             frame.style.opacity = '1'; template.style.opacity = '0'; status.innerText = "POSISI OK!";
                             if (Date.now() - lastVibrateTime > 1500) { if ("vibrate" in navigator) navigator.vibrate(100); lastVibrateTime = Date.now(); }
                         }
-                    } else {
-                        frame.style.opacity = '0'; template.style.opacity = '1'; hint.innerText = "Posisikan Wajah";
-                    }
+                    } else { frame.style.opacity = '0'; template.style.opacity = '1'; hint.innerText = "Posisikan Wajah"; }
                 }, 400);
             } catch(e) { toast("Kamera Error"); }
         }
@@ -919,16 +915,18 @@
             } catch (err) { hideLoader(); alert("Error: " + err.message); }
         }
 
-        // ==========================================
-        // UI & NAV
-        // ==========================================
         function navigateTo(pageId) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             document.getElementById(pageId).classList.add('active');
             if (webcamStream) { webcamStream.getTracks().forEach(track => track.stop()); webcamStream = null; }
             if (detectionInterval) clearInterval(detectionInterval);
+            
             if (pageId === 'face-page') startAuthWebcam();
-            if (pageId === 'petugas-page') loadStafList();
+            if (pageId === 'petugas-page') {
+                // SINKRONASI OTOMATIS SAAT HALAMAN STAF DIBUKA
+                syncCloudToLocal();
+                loadStafList();
+            }
             if (pageId === 'rekapan-page') loadAbsensiData();
             if (pageId === 'manual-absen-page') loadManualSelect();
         }
@@ -978,39 +976,20 @@
             });
         }
 
-        // ==========================================
-        // SYSTEM ENGINE 
-        // ==========================================
         function updateClock() {
-            const now = new Date(); 
-            const h = now.getHours(), m = now.getMinutes();
+            const now = new Date(), h = now.getHours(), m = now.getMinutes();
             document.getElementById('clock').innerText = now.toLocaleTimeString('id-ID', {hour12:false});
             document.getElementById('date').innerText = now.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-            const isFriday = now.getDay() === 5;
-            const sch = isFriday ? CONFIG.friday : CONFIG.normal;
-            const cur = h * 60 + m;
             const parseT = (s) => { if(!s) return 0; const [hh, mm] = s.split(':').map(Number); return hh * 60 + mm; };
-            
-            const tIn = parseT(sch.in), tInL = parseT(sch.inLimit), tOut = parseT(sch.out), tOutL = parseT(sch.outLimit);
-
+            const sch = (now.getDay() === 5) ? CONFIG.friday : CONFIG.normal;
+            const cur = h * 60 + m, tIn = parseT(sch.in), tInL = parseT(sch.inLimit), tOut = parseT(sch.out), tOutL = parseT(sch.outLimit);
             let sess = "Sesi Tutup", lim = "--:--", col = "text-slate-400", labelCountdown = "PULANG";
             
-            if (cur >= tIn && cur <= tInL) { 
-                sess = "Sesi Masuk"; lim = sch.inLimit; col = "text-emerald-600"; labelCountdown = "AKTIF";
-            } 
-            else if (cur >= tOut && cur <= tOutL) { 
-                sess = "Sesi Pulang"; lim = sch.outLimit; col = "text-blue-600"; labelCountdown = "AKTIF";
-            }
-            else {
-                sess = "Sesi Tutup";
-                lim = "--:--";
-                col = "text-slate-400";
-                labelCountdown = "TUTUP";
-            }
+            if (cur >= tIn && cur <= tInL) { sess = "Sesi Masuk"; lim = sch.inLimit; col = "text-emerald-600"; labelCountdown = "AKTIF"; } 
+            else if (cur >= tOut && cur <= tOutL) { sess = "Sesi Pulang"; lim = sch.outLimit; col = "text-blue-600"; labelCountdown = "AKTIF"; }
+            else { sess = "Sesi Tutup"; lim = "--:--"; col = "text-slate-400"; labelCountdown = "TUTUP"; }
 
-            if(CONFIG.testMode) { 
-                sess = "Sesi Ujicoba"; lim = "TEST"; col = "text-rose-500"; labelCountdown = "AKTIF";
-            }
+            if(CONFIG.testMode) { sess = "Sesi Ujicoba"; lim = "TEST"; col = "text-rose-500"; labelCountdown = "AKTIF"; }
 
             document.getElementById('session-tag').innerText = sess;
             document.getElementById('session-limit').innerText = lim;
@@ -1019,38 +998,19 @@
         }
 
         navigator.geolocation.watchPosition(pos => {
-            const dist = calculateDistance(pos.coords.latitude, pos.coords.longitude, CONFIG.lat, CONFIG.lng);
-            const label = document.getElementById('gps-label'), dot = document.getElementById('gps-indicator');
-            
-            if (CONFIG.testMode) { 
-                canScan = true; 
-                label.innerText = "BYPASS GPS"; 
-                dot.className = "w-2.5 h-2.5 bg-rose-500 rounded-full animate-pulse"; 
-                return; 
-            }
-            if (!CONFIG.enabled) { 
-                canScan = true; 
-                label.innerText = "GPS OFF"; 
-                dot.className = "w-2.5 h-2.5 bg-slate-300 rounded-full"; 
-                return; 
-            }
+            const dist = calculateDistance(pos.coords.latitude, pos.coords.longitude, CONFIG.lat, CONFIG.lng), label = document.getElementById('gps-label'), dot = document.getElementById('gps-indicator');
+            if (CONFIG.testMode) { canScan = true; label.innerText = "BYPASS GPS"; dot.className = "w-2.5 h-2.5 bg-rose-500 rounded-full animate-pulse"; return; }
+            if (!CONFIG.enabled) { canScan = true; label.innerText = "GPS OFF"; dot.className = "w-2.5 h-2.5 bg-slate-300 rounded-full"; return; }
             
             if (dist <= CONFIG.radius) {
-                canScan = true; 
-                label.innerText = "Area Puskesmas (" + Math.round(dist) + "m)"; 
-                label.className = "text-emerald-600 text-[10px] font-black uppercase"; 
-                dot.className = "w-2.5 h-2.5 bg-emerald-500 rounded-full shadow-[0_0_10px_#10b981]";
+                canScan = true; label.innerText = "Area Puskesmas (" + Math.round(dist) + "m)"; label.className = "text-emerald-600 text-[10px] font-black uppercase"; dot.className = "w-2.5 h-2.5 bg-emerald-500 rounded-full shadow-[0_0_10px_#10b981]";
             } else {
-                canScan = false; 
-                label.innerText = "Luar Area (" + Math.round(dist) + "m)"; 
-                label.className = "text-rose-600 text-[10px] font-black uppercase"; 
-                dot.className = "w-2.5 h-2.5 bg-rose-500 rounded-full animate-pulse";
+                canScan = false; label.innerText = "Luar Area (" + Math.round(dist) + "m)"; label.className = "text-rose-600 text-[10px] font-black uppercase"; dot.className = "w-2.5 h-2.5 bg-rose-500 rounded-full animate-pulse";
             }
         }, null, { enableHighAccuracy: true });
 
         function calculateDistance(l1, n1, l2, n2) {
-            const R = 6371e3; const dL = (l2-l1)*Math.PI/180, dN = (n2-n1)*Math.PI/180;
-            const a = Math.sin(dL/2)**2 + Math.cos(l1*Math.PI/180)*Math.cos(l2*Math.PI/180)*Math.sin(dN/2)**2;
+            const R = 6371e3, dL = (l2-l1)*Math.PI/180, dN = (n2-n1)*Math.PI/180, a = Math.sin(dL/2)**2 + Math.cos(l1*Math.PI/180)*Math.cos(l2*Math.PI/180)*Math.sin(dN/2)**2;
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
 
@@ -1061,12 +1021,8 @@
         
         function handleScanButton() { 
             const sessionStatus = document.getElementById('session-tag').innerText;
-            if (!CONFIG.testMode && sessionStatus === "Sesi Tutup") {
-                return alert("Absensi Sedang Tutup.");
-            }
-            if (!CONFIG.testMode && CONFIG.enabled && !canScan) {
-                return alert("Akses Ditolak! Anda berada di luar radius kantor.");
-            }
+            if (!CONFIG.testMode && sessionStatus === "Sesi Tutup") return alert("Absensi Sedang Tutup.");
+            if (!CONFIG.testMode && CONFIG.enabled && !canScan) return alert("Akses Ditolak! Anda berada di luar radius kantor.");
             navigateTo('face-page'); 
         }
 
@@ -1078,7 +1034,7 @@
                 s.openCursor().onsuccess = (e) => {
                     const cursor = e.target.result;
                     if(cursor) { if(cursor.value.tanggal === today) count++; cursor.continue(); } 
-                    else { document.getElementById('stat-absen').innerText = count; }
+                    else document.getElementById('stat-absen').innerText = count;
                 };
             });
         }
@@ -1099,9 +1055,7 @@
                     const blob = new Blob([JSON.stringify(e.target.result)], {type: "application/json"});
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `Backup_Masook_${new Date().toISOString().split('T')[0]}.json`;
-                    a.click();
+                    a.href = url; a.download = `Backup_Masook_${new Date().toISOString().split('T')[0]}.json`; a.click();
                 };
             });
         }
@@ -1109,8 +1063,7 @@
         function exportAbsensiToExcel() {
             dbAction("absensi", "readonly", store => {
                 store.getAll().onsuccess = (e) => {
-                    const ws = XLSX.utils.json_to_sheet(e.target.result);
-                    const wb = XLSX.utils.book_new();
+                    const ws = XLSX.utils.json_to_sheet(e.target.result), wb = XLSX.utils.book_new();
                     XLSX.utils.book_append_sheet(wb, ws, "Rekap");
                     XLSX.writeFile(wb, `Absensi_${new Date().toLocaleDateString()}.xlsx`);
                 };
